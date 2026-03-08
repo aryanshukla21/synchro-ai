@@ -10,8 +10,8 @@ const Navbar = () => {
 
     return (
         <nav className="bg-[#1e293b] border-b border-gray-700 sticky top-0 z-50 shadow-md">
-            {/* Added max-w-7xl and mx-auto to center the navbar data items horizontally */}
-            <div className="max-w-7xl mx-auto px-6 py-3 flex justify-between items-center">
+
+            <div className="container mx-auto flex justify-between items-center px-6 py-3">
 
                 {/* Logo Section */}
                 <Link to="/" className="flex items-center gap-3 text-white font-bold text-xl hover:opacity-90 transition">
@@ -34,7 +34,7 @@ const Navbar = () => {
                             <p className="text-[11px] text-gray-400 mt-0.5 font-medium">Active</p>
                         </div>
 
-                        {/* UPDATED: Dynamic Avatar Rendering */}
+                        {/* Dynamic Avatar Rendering */}
                         {user.avatar ? (
                             <img
                                 src={user.avatar}
