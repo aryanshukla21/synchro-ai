@@ -18,16 +18,18 @@ const storage = multer.diskStorage({
     }
 });
 
-// Filter file types (e.g., only images and PDFs)
+// Filter file types
 const fileFilter = (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|pdf|zip/;
+    // ADDED: 'webp' to the allowed regex pattern
+    const allowedTypes = /jpeg|jpg|png|webp|pdf|zip/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
 
     if (extname && mimetype) {
         return cb(null, true);
     } else {
-        cb(new Error('Only .jpeg, .jpg, .png, .pdf, and .zip files are allowed!'), false);
+        // Updated error message to include webp
+        cb(new Error('Only .jpeg, .jpg, .png, .webp, .pdf, and .zip files are allowed!'), false);
     }
 };
 

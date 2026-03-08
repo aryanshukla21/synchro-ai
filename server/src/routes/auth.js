@@ -9,6 +9,7 @@ const {
     updateDetails
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/authMiddleware');
+const upload = require('../middleware/multerMiddleware');
 
 const router = express.Router();
 
@@ -18,6 +19,8 @@ router.post('/login', login);
 router.post('/forgot-password', forgotPassword);
 router.put('/reset-password/:resettoken', resetPassword);
 router.get('/me', protect, getMe);
-router.put('/updatedetails', protect, updateDetails);
+
+// UPDATED: Added upload.single('avatar') to process the file upload
+router.put('/updatedetails', protect, upload.single('avatar'), updateDetails);
 
 module.exports = router;

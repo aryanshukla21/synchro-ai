@@ -1,6 +1,5 @@
 const cloudinary = require('cloudinary').v2;
-const fs = require('fs');
-const { ApiError } = require('./apiResponse');
+const fs = require('fs/promises'); // Use promises to prevent blocking the Node.js event loop
 
 // Configure Cloudinary with environment variables
 cloudinary.config({
@@ -11,10 +10,11 @@ cloudinary.config({
 
 /**
  * Uploads a file from the local 'uploads' folder to Cloudinary
- * Path to the file stored temporarily on the server
- * The Cloudinary folder name (e.g., 'submissions', 'avatars')
+ * @param {string} localFilePath - Path to the file stored temporarily on the server
+ * @param {string} folder - The Cloudinary folder name (e.g., 'submissions', 'avatars')
+ * @returns {object|null} - The Cloudinary response object or null if failed
  */
-const uploadOnCloudinary = async (localFilePath, folder = 'syncro-ai') => {
+const uploadOnCloudinary = async (localFilePath, folder = 'synchro-ai') => {
     try {
         if (!localFilePath) return null;
 
@@ -24,23 +24,34 @@ const uploadOnCloudinary = async (localFilePath, folder = 'syncro-ai') => {
             folder: folder
         });
 
-        // File has been uploaded successfully, remove the locally saved temporary file
-        fs.unlinkSync(localFilePath);
+        // File has been uploaded successfully, remove the locally saved temporary file asynchronously
+        try {
+            await fs.unlink(localFilePath);
+        } catch (unlinkError) {
+            console.error("Failed to delete temporary local file after upload:", unlinkError);
+        }
 
         return response;
     } catch (error) {
-        // Remove the locally saved temporary file as the upload operation failed
-        if (fs.existsSync(localFilePath)) {
-            fs.unlinkSync(localFilePath);
-        }
         console.error("Cloudinary Upload Error:", error);
+
+        // Remove the locally saved temporary file as the upload operation failed
+        try {
+            if (localFilePath) {
+                await fs.unlink(localFilePath);
+            }
+        } catch (unlinkError) {
+            console.error("Failed to delete temporary local file after error:", unlinkError);
+        }
+
         return null;
     }
 };
 
 /**
  * Deletes a file from Cloudinary using its public ID
- * The public ID of the file on Cloudinary
+ * @param {string} publicId - The public ID of the file on Cloudinary
+ * @returns {object|null} - The result of the deletion or null if failed
  */
 const deleteFromCloudinary = async (publicId) => {
     try {

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const { generateToken } = require('../utils/jwt');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');
 const { hashPassword, compareHash } = require('../utils/encryption');
+const { uploadOnCloudinary } = require('../utils/cloudinaryHelper');
 const sendEmail = require('../services/emailServices');
 const crypto = require('crypto');
 
@@ -243,11 +244,25 @@ exports.updateDetails = async (req, res, next) => {
     try {
         const fieldsToUpdate = {
             name: req.body.name,
-            skills: req.body.skills,
-            avatar: req.body.avatar
         };
 
-        const user = await User.findByIdAndUpdate(req.user.id, fieldsToUpdate, {
+        // When using FormData, arrays are sent as comma-separated strings. We must parse it.
+        if (req.body.skills) {
+            fieldsToUpdate.skills = req.body.skills.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        // --- NEW: CLOUDINARY AVATAR UPLOAD LOGIC ---
+        if (req.file) {
+            const cloudinaryResponse = await uploadOnCloudinary(req.file.path, 'avatars');
+            if (cloudinaryResponse) {
+                fieldsToUpdate.avatar = cloudinaryResponse.secure_url;
+            } else {
+                return next(new ApiError('Failed to upload avatar to image server', 500));
+            }
+        }
+
+        // Note: Using req.user._id instead of req.user.id for consistency
+        const user = await User.findByIdAndUpdate(req.user._id, fieldsToUpdate, {
             new: true,
             runValidators: true
         });
