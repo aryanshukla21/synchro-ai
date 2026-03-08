@@ -2,21 +2,28 @@ import { useState, useEffect } from 'react';
 import {
     X, CheckCircle, AlertTriangle, Play, Save,
     Calendar, Flag, User, Clock, CheckCircle2, XCircle,
-    FileText, ExternalLink
+    FileText, ExternalLink, MessageSquare, Send, Trash2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
+import { useSocket } from '../../contexts/SocketContext';
 
 const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
     const { user } = useAuth();
     const navigate = useNavigate();
     const { showToast } = useToast();
+    const { socket } = useSocket();
 
     const [timeLeft, setTimeLeft] = useState('');
     const [submissions, setSubmissions] = useState([]);
     const [isProcessing, setIsProcessing] = useState(false);
+
+    // Comments State
+    const [comments, setComments] = useState([]);
+    const [newComment, setNewComment] = useState('');
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
     // Edit State
     const [isEditing, setIsEditing] = useState(false);
@@ -43,18 +50,23 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
     const isOwner = String(task?.createdBy?._id || task?.createdBy) === String(user?._id);
     const isAssignee = String(task?.assignedTo?._id || task?.assignedTo) === String(user?._id);
 
-    // --- 1. FETCH SUBMISSIONS ---
+    // --- 1. FETCH SUBMISSIONS & COMMENTS ---
     useEffect(() => {
-        const fetchSubmissions = async () => {
+        const fetchTaskData = async () => {
             if (!task?._id) return;
             try {
-                const { data } = await api.get(`/submissions/task/${task._id}`);
-                setSubmissions(data.data || []);
+                // Fetch Submissions
+                const subRes = await api.get(`/submissions/task/${task._id}`);
+                setSubmissions(subRes.data.data || []);
+
+                // Fetch Comments
+                const commentRes = await api.get(`/comments/task/${task._id}`);
+                setComments(commentRes.data.data || []);
             } catch (error) {
-                console.error("Failed to load submissions", error);
+                console.error("Failed to load task associated data", error);
             }
         };
-        fetchSubmissions();
+        fetchTaskData();
     }, [task?._id]);
 
     // --- 2. COUNTDOWN LOGIC ---
@@ -69,6 +81,34 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
         };
         setTimeLeft(calculateTimeLeft());
     }, [task?.deadline]);
+
+    // --- 3. REAL-TIME SOCKET LISTENERS FOR COMMENTS ---
+    useEffect(() => {
+        if (!socket || !task?._id) return;
+
+        // Listen for new incoming comments
+        const handleNewComment = (newComment) => {
+            // Only add to state if the comment belongs to the currently open task
+            if (newComment.task === task._id) {
+                setComments((prev) => [...prev, newComment]);
+            }
+        };
+
+        // Listen for deleted comments
+        const handleDeletedComment = (payload) => {
+            if (payload.taskId === task._id) {
+                setComments((prev) => prev.filter(c => c._id !== payload.commentId));
+            }
+        };
+
+        socket.on('commentAdded', handleNewComment);
+        socket.on('commentDeleted', handleDeletedComment);
+
+        return () => {
+            socket.off('commentAdded', handleNewComment);
+            socket.off('commentDeleted', handleDeletedComment);
+        };
+    }, [socket, task?._id]);
 
     // --- HANDLERS ---
     const handleInviteResponse = async (response) => {
@@ -95,7 +135,6 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
     const handleAdminReview = async (action) => {
         setIsProcessing(true);
         try {
-            // Backend endpoint: PATCH /api/task/:id/review
             const { data } = await api.patch(`/task/${task._id}/review`, { action });
             if (onUpdate) onUpdate(data.data);
             showToast(`Task successfully ${action === 'Merge' ? 'Merged' : 'Returned'}`, 'success');
@@ -103,6 +142,43 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
             showToast(error.response?.data?.message || 'Review failed', 'error');
         } finally {
             setIsProcessing(false);
+        }
+    };
+
+    // Add Comment
+    const handleAddComment = async (e) => {
+        e.preventDefault();
+        if (!newComment.trim()) return;
+
+        setIsSubmittingComment(true);
+        try {
+            // We only need to POST, the socket listener will catch the returned comment
+            // and add it to our state automatically!
+            await api.post('/comments', {
+                taskId: task._id,
+                text: newComment.trim()
+            });
+
+            setNewComment('');
+        } catch (error) {
+            showToast('Failed to post comment', 'error');
+            console.error(error);
+        } finally {
+            setIsSubmittingComment(false);
+        }
+    };
+
+    // Delete Comment
+    const handleDeleteComment = async (commentId) => {
+        if (!window.confirm("Are you sure you want to delete this comment?")) return;
+
+        try {
+            await api.delete(`/comments/${commentId}`);
+            // The socket listener handles removing it from the state dynamically!
+            showToast('Comment deleted', 'success');
+        } catch (error) {
+            showToast('Failed to delete comment', 'error');
+            console.error(error);
         }
     };
 
@@ -127,8 +203,8 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                     <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-mono text-gray-500">#{task._id.slice(-4)}</span>
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold border uppercase tracking-wider ${task.status === 'Merged' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                task.status === 'Submitted' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                                    'bg-gray-700/50 text-gray-400 border-gray-600'
+                            task.status === 'Submitted' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                'bg-gray-700/50 text-gray-400 border-gray-600'
                             }`}>
                             {task.status}
                         </span>
@@ -157,7 +233,7 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
 
             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-                {/* --- 1. ADMIN REVIEW ACTIONS (Visible only for Owner when Submitted) --- */}
+                {/* --- ADMIN REVIEW ACTIONS --- */}
                 {isOwner && task.status === 'Submitted' && (
                     <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-5 space-y-4">
                         <div className="flex items-center gap-2 text-indigo-400">
@@ -184,7 +260,7 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                     </div>
                 )}
 
-                {/* --- 2. ASSIGNEE INVITE ACTION --- */}
+                {/* --- ASSIGNEE INVITE ACTION --- */}
                 {isAssignee && task.assignmentStatus === 'Pending' && (
                     <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-xl p-5 animate-pulse">
                         <div className="flex items-center gap-2 text-indigo-400 mb-2">
@@ -199,7 +275,7 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                     </div>
                 )}
 
-                {/* --- 3. CONTROLS --- */}
+                {/* --- CONTROLS --- */}
                 <div className="flex gap-3">
                     {isOwner && (
                         isEditing ? (
@@ -223,7 +299,7 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                     )}
                 </div>
 
-                {/* --- 4. DETAILS GRID --- */}
+                {/* --- DETAILS GRID --- */}
                 <div className="grid grid-cols-2 gap-6 bg-[#0f172a]/30 p-4 rounded-xl border border-gray-800">
                     <div>
                         <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Assignee</label>
@@ -277,7 +353,7 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                     </div>
                 </div>
 
-                {/* --- 5. DESCRIPTION --- */}
+                {/* --- DESCRIPTION --- */}
                 <div>
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 block">Description</label>
                     {isEditing ? (
@@ -295,7 +371,7 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                     )}
                 </div>
 
-                {/* --- 6. SUBMISSION HISTORY & AI REVIEW --- */}
+                {/* --- SUBMISSION HISTORY & AI REVIEW --- */}
                 {latestAIReview && (
                     <div className="border border-indigo-500/30 rounded-xl overflow-hidden relative bg-[#0f172a]">
                         <div className="bg-indigo-600/10 p-4 border-b border-indigo-500/20 flex items-center gap-2">
@@ -330,12 +406,80 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
                                     </span>
                                 </div>
                                 <span className={`px-2 py-0.5 rounded border ${sub.status === 'Approved' ? 'text-emerald-400 border-emerald-500/20' :
-                                        sub.status === 'Rejected' ? 'text-red-400 border-red-500/20' : 'text-yellow-400 border-yellow-500/20'
+                                    sub.status === 'Rejected' ? 'text-red-400 border-red-500/20' : 'text-yellow-400 border-yellow-500/20'
                                     }`}>{sub.status}</span>
                             </div>
                         ))}
                     </div>
                 )}
+
+                {/* --- TASK COMMENTS SECTION --- */}
+                <div className="pt-6 border-t border-gray-800 pb-10">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <MessageSquare size={14} /> Discussion ({comments.length})
+                    </h3>
+
+                    {/* Comments List */}
+                    <div className="space-y-4 mb-6">
+                        {comments.length === 0 ? (
+                            <p className="text-xs text-gray-500 italic text-center py-4 bg-[#0f172a]/30 rounded-lg border border-gray-800/50">
+                                No comments yet. Start the discussion!
+                            </p>
+                        ) : (
+                            comments.map((comment) => (
+                                <div key={comment._id} className="flex gap-3">
+                                    <div className="w-8 h-8 rounded-full bg-gray-700 flex shrink-0 items-center justify-center text-white text-xs overflow-hidden border border-gray-600">
+                                        {comment.user?.avatar ? (
+                                            <img src={comment.user.avatar} alt="avatar" className="w-full h-full object-cover" />
+                                        ) : (
+                                            comment.user?.name?.charAt(0) || 'U'
+                                        )}
+                                    </div>
+                                    <div className="flex-1 bg-[#0f172a] p-3 rounded-lg rounded-tl-none border border-gray-700/50">
+                                        <div className="flex justify-between items-baseline mb-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-gray-300">{comment.user?.name || 'Unknown User'}</span>
+                                                <span className="text-[10px] text-gray-500">
+                                                    {new Date(comment.createdAt).toLocaleDateString()} {new Date(comment.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </div>
+                                            {/* Delete Button (Only visible if the current user is the author) */}
+                                            {(comment.user?._id === user?._id || comment.user === user?._id) && (
+                                                <button
+                                                    onClick={() => handleDeleteComment(comment._id)}
+                                                    className="text-gray-500 hover:text-red-400 transition"
+                                                    title="Delete Comment"
+                                                >
+                                                    <Trash2 size={12} />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <p className="text-sm text-gray-400 whitespace-pre-wrap">{comment.text}</p>
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    {/* Add Comment Input */}
+                    <form onSubmit={handleAddComment} className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Type a comment..."
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                            className="flex-1 bg-[#0f172a] border border-gray-600 rounded-lg px-4 py-2.5 text-sm text-white focus:border-indigo-500 outline-none transition"
+                        />
+                        <button
+                            type="submit"
+                            disabled={!newComment.trim() || isSubmittingComment}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 text-white px-4 rounded-lg transition flex items-center justify-center"
+                        >
+                            <Send size={16} />
+                        </button>
+                    </form>
+                </div>
+
             </div>
         </div>
     );

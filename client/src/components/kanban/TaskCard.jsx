@@ -1,4 +1,4 @@
-import { MessageSquare, Paperclip, Calendar } from 'lucide-react';
+import { MessageSquare, Paperclip } from 'lucide-react';
 
 const TaskCard = ({ task, onClick }) => {
     const priorityColors = {
@@ -6,6 +6,11 @@ const TaskCard = ({ task, onClick }) => {
         Medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
         Low: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     };
+
+    // If your backend ever populates 'commentCount' or 'comments' arrays, it will reflect here.
+    // Otherwise, it cleanly defaults to 0 instead of a fake hardcoded number.
+    const commentCount = task.commentCount || task.comments?.length || 0;
+    const attachmentCount = task.attachmentCount || task.attachments?.length || 0;
 
     return (
         <div
@@ -27,14 +32,15 @@ const TaskCard = ({ task, onClick }) => {
                 {task.title}
             </h4>
 
+            {/* Dynamic Counters */}
             <div className="flex items-center gap-3 text-gray-500 text-xs mt-auto">
                 <div className="flex items-center gap-1">
                     <MessageSquare size={14} />
-                    <span>3</span>
+                    <span>{commentCount}</span>
                 </div>
                 <div className="flex items-center gap-1">
                     <Paperclip size={14} />
-                    <span>1</span>
+                    <span>{attachmentCount}</span>
                 </div>
             </div>
         </div>
