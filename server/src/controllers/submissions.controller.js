@@ -2,7 +2,7 @@ const Submission = require('../models/Submission');
 const Task = require('../models/Task');
 const Activity = require('../models/Activity');
 const { uploadOnCloudinary } = require('../utils/cloudinaryHelper');
-const aiService = require('../services/aiServices'); // Ensure filename matches (aiServices vs aiService)
+const aiService = require('../services/aiServices');
 const notificationService = require('../services/notificationServices');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');
 
@@ -11,44 +11,52 @@ exports.submitWork = async (req, res, next) => {
         const { taskId, comment } = req.body;
         let contentUrl = req.body.contentUrl;
 
-        // Check if task exists
+        // 1. Initial Validation
+        if (!taskId) {
+            return next(new ApiError('Task ID is required', 400));
+        }
+
         const task = await Task.findById(taskId);
         if (!task) {
             return next(new ApiError('Task not found', 404));
         }
 
-        // Handle File Upload to Cloudinary if a file exists
+        // 2. Handle File Upload to Cloudinary if a file exists
         if (req.file) {
             const cloudinaryResponse = await uploadOnCloudinary(req.file.path, 'submissions');
             if (cloudinaryResponse) {
+                // If a file is uploaded, we use the Cloudinary URL.
                 contentUrl = cloudinaryResponse.secure_url;
+            } else {
+                return next(new ApiError('Failed to upload file to Cloudinary', 500));
             }
         }
 
+        // 3. Final Content Validation
         if (!contentUrl) {
-            return next(new ApiError('Please provide a file or a content URL', 400));
+            return next(new ApiError('Please provide a file or a GitHub/Content URL', 400));
         }
 
-        // Create the submission record
+        // 4. Create the submission record
         const submission = await Submission.create({
             task: taskId,
-            submittedBy: req.user._id, // FIX: Use _id
+            submittedBy: req.user._id,
             contentUrl,
-            comment
+            comment: comment || ''
         });
 
-        // Update task status to Review-Requested
+        // 5. Update task status
         task.status = 'Review-Requested';
         await task.save();
 
-        // Log activity
+        // 6. Log activity
         await Activity.create({
             project: task.project,
-            user: req.user._id, // FIX: Use _id
+            user: req.user._id,
             action: `Submitted work for task: "${task.title}"`
         });
 
-        res.status(201).json(new ApiResponse(submission, 'Work submitted for review', 201));
+        res.status(201).json(new ApiResponse(submission, 'Work submitted for review successfully', 201));
     } catch (error) {
         next(error);
     }
@@ -69,33 +77,43 @@ exports.mergeWork = async (req, res, next) => {
             return next(new ApiError('Associated task not found', 404));
         }
 
-        // Trigger AI Review Service
-        // Note: Ensure aiService is imported correctly as 'aiServices' if that's the filename
-        const aiReviewData = await aiService.reviewSubmission(
-            task.project,
-            { title: task.title, description: task.description },
-            submission.comment + " " + submission.contentUrl
-        );
+        // Trigger AI Review Service with error boundary
+        let aiReviewData = null;
+        try {
+            aiReviewData = await aiService.reviewSubmission(
+                task.project,
+                { title: task.title, description: task.description },
+                `${submission.comment || ''} ${submission.contentUrl}`
+            );
+        } catch (aiError) {
+            console.error("AI Review generation failed:", aiError);
+            // We catch this so a Gemini API timeout doesn't block the manager from merging the work
+        }
 
-        // Update submission with AI insights
-        submission.aiReview = aiReviewData;
+        // Update submission
+        if (aiReviewData) {
+            submission.aiReview = aiReviewData;
+        }
         submission.status = 'Approved';
         await submission.save();
 
         // Finalize Task
         task.status = 'Merged';
-        task.mergedBy = req.user._id; // FIX: Use _id
+        task.mergedBy = req.user._id;
         await task.save();
 
         // Audit Trail
+        const actionText = aiReviewData
+            ? `Merged task: "${task.title}" after AI Review (Score: ${aiReviewData.score})`
+            : `Merged task: "${task.title}" (AI Review bypassed/unavailable)`;
+
         await Activity.create({
             project: task.project,
-            user: req.user._id, // FIX: Use _id
-            action: `Merged task: "${task.title}" after AI Review (Score: ${aiReviewData.score})`
+            user: req.user._id,
+            action: actionText
         });
 
         // Notify the user who submitted the work
-        // (Assuming notificationService exists and works)
         if (notificationService && typeof notificationService.notifyMerge === 'function') {
             await notificationService.notifyMerge(
                 submission.submittedBy,
@@ -106,7 +124,7 @@ exports.mergeWork = async (req, res, next) => {
 
         res.status(200).json(new ApiResponse(
             { submission, task },
-            'Work successfully merged with AI review'
+            'Work successfully merged'
         ));
     } catch (error) {
         next(error);
@@ -115,11 +133,17 @@ exports.mergeWork = async (req, res, next) => {
 
 exports.getTaskSubmissions = async (req, res, next) => {
     try {
-        const submissions = await Submission.find({ task: req.params.taskId })
+        const { taskId } = req.params;
+
+        if (!taskId) {
+            return next(new ApiError('Task ID is required', 400));
+        }
+
+        const submissions = await Submission.find({ task: taskId })
             .populate('submittedBy', 'name email avatar')
             .sort({ createdAt: -1 });
 
-        res.status(200).json(new ApiResponse(submissions, 'Submissions retrieved'));
+        res.status(200).json(new ApiResponse(submissions, 'Submissions retrieved successfully'));
     } catch (error) {
         next(error);
     }

@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Info, Check, Trash2 } from 'lucide-react';
+import { Bell, Info } from 'lucide-react';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../contexts/SocketContext'; // Import socket hook
 
 const NotificationBell = () => {
     const { user } = useAuth();
+    const { socket } = useSocket(); // Initialize socket
     const [notifications, setNotifications] = useState([]);
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef(null);
 
-    // Fetch Notifications
+    // Fetch Initial Notifications
     const fetchNotifications = async () => {
         try {
             const { data } = await api.get('/notifications');
@@ -21,16 +23,31 @@ const NotificationBell = () => {
         }
     };
 
-    // Initial Fetch & Polling (every 30s)
+    // Initial Fetch on mount or when user changes
     useEffect(() => {
         if (user) {
             fetchNotifications();
-            const interval = setInterval(fetchNotifications, 30000);
-            return () => clearInterval(interval);
         }
     }, [user]);
 
-    // Handle Click Outside
+    // Real-time socket listener for incoming notifications
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleNewNotification = (newNotification) => {
+            setNotifications((prev) => [newNotification, ...prev]);
+        };
+
+        // Listen for 'newNotification' event emitted by the backend
+        socket.on('newNotification', handleNewNotification);
+
+        // Cleanup listener on unmount or socket change
+        return () => {
+            socket.off('newNotification', handleNewNotification);
+        };
+    }, [socket]);
+
+    // Handle Click Outside to close dropdown
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {

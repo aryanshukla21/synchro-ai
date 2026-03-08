@@ -1,10 +1,12 @@
 const express = require('express');
-const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const http = require('http');
-const { Server } = require('socket.io');
 const connectDB = require('./config/db');
+
+// Import Config Helpers & Utilities
+const socketHelper = require('./config/socket'); // <--- ADDED: Imports your new socket manager
+const errorHandler = require('./utils/errorHandler'); // <--- ADDED: Imports global error handler
 
 // Import Routes
 const authRoutes = require('./routes/auth');
@@ -15,8 +17,8 @@ const activityRoutes = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
 const commentRoutes = require('./routes/comments');
 
-// Import Service (Capture the instance to init later)
-const notificationService = require('./services/notificationServices'); // <--- UPDATED
+// Import Services
+const notificationService = require('./services/notificationServices');
 
 // Load environment variables
 dotenv.config();
@@ -30,20 +32,7 @@ const server = http.createServer(app);
 // --- CONFIGURATION ---
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
-// 1. Socket.io Setup
-const io = new Server(server, {
-    cors: {
-        origin: CLIENT_URL,
-        methods: ["GET", "POST", "PATCH", "DELETE", "PUT"], // Added PUT just in case
-        credentials: true
-    }
-});
-
-// 2. Initialize Services with Socket.io
-// CRITICAL: This connects the notification service to the live socket
-notificationService.init(io); // <--- ADD THIS LINE
-
-// 3. Middleware
+// 1. Standard Middleware
 app.use(cors({
     origin: CLIENT_URL,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -51,35 +40,16 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// 4. Make io accessible in routes via req.io (Optional, if you use req.io in controllers)
-app.use((req, res, next) => {
-    req.io = io;
-    next();
-});
+// 2. Socket.io Setup
+// CRITICAL: Initialize socket.io using the config/socket.js helper.
+// This single line handles the CORS, the ping limits, and the room joining logic automatically.
+const io = socketHelper.init(server);
 
-// 5. Socket.io Connection Logic
-io.on('connection', (socket) => {
-    console.log(`User Connected: ${socket.id}`);
+// 3. Initialize Services with Socket.io
+// Connects the notification service to the live socket
+notificationService.init(io);
 
-    // Join Project Room
-    socket.on('join_project', (projectId) => {
-        socket.join(projectId);
-        console.log(`User ${socket.id} joined project: ${projectId}`);
-    });
-
-    // Join User Room (For private notifications)
-    // The frontend should emit this or we rely on the user ID being the room name
-    socket.on('join_user_room', (userId) => {
-        socket.join(userId);
-        console.log(`User ${socket.id} joined private room: ${userId}`);
-    });
-
-    socket.on('disconnect', () => {
-        console.log("User Disconnected", socket.id);
-    });
-});
-
-// 6. Mount Routes
+// 4. Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/task', taskRoutes);
@@ -88,19 +58,14 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
 
-// 7. Error Handling Middleware
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({
-        success: false,
-        message: 'Server Error',
-        error: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-});
+// 5. Global Error Handling Middleware
+// Replaced the generic inline handler with your robust custom error handler
+app.use(errorHandler);
 
+// --- SERVER STARTUP ---
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    console.log(`Socket.io running on port ${PORT}`);
+    console.log(`Socket.io initialized and listening for connections`);
 });

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext } from 'react-router-dom';
+import { useOutletContext, useParams } from 'react-router-dom'; // Imported useParams
 import api from '../api/axios';
 import TaskCard from '../components/kanban/TaskCard';
 import TaskDetailPanel from '../components/kanban/TaskDetailPanel';
-import { Search, Menu, Plus, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Menu, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
+import { useSocket } from '../contexts/SocketContext'; // Import socket hook
 
 const Kanban = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
+    const { projectId } = useParams(); // Get projectId from route if applicable
+    const { socket } = useSocket(); // Initialize socket
     const [tasks, setTasks] = useState([]);
     const [selectedTask, setSelectedTask] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -24,7 +27,9 @@ const Kanban = () => {
 
     const fetchTasks = async () => {
         try {
-            const { data } = await api.get('/task/user/me');
+            // Adjust this route if you are viewing a specific project vs all user tasks
+            const endpoint = projectId ? `/task/project/${projectId}` : '/task/user/me';
+            const { data } = await api.get(endpoint);
             setTasks(data.data);
         } catch (error) {
             console.error("Failed to load tasks", error);
@@ -33,9 +38,61 @@ const Kanban = () => {
         }
     };
 
+    // Initial Fetch
     useEffect(() => {
         fetchTasks();
-    }, []);
+    }, [projectId]);
+
+    // Real-Time Socket Connection & Event Listeners
+    useEffect(() => {
+        if (!socket) return;
+
+        // If we are in a specific project board, join that room.
+        // If not, we rely on the backend sending updates to the user's specific room.
+        if (projectId) {
+            socket.emit('joinProject', projectId);
+        }
+
+        // Listener for when a task is updated (e.g., dragged to a new column)
+        const handleTaskUpdated = (updatedTask) => {
+            setTasks((prevTasks) =>
+                prevTasks.map(task => task._id === updatedTask._id ? updatedTask : task)
+            );
+
+            // Optional: If the updated task is currently selected, update the detail panel
+            setSelectedTask((prevSelected) =>
+                prevSelected && prevSelected._id === updatedTask._id ? updatedTask : prevSelected
+            );
+        };
+
+        // Listener for new task creation
+        const handleTaskCreated = (newTask) => {
+            setTasks((prevTasks) => [...prevTasks, newTask]);
+        };
+
+        // Listener for task deletion
+        const handleTaskDeleted = (deletedTaskId) => {
+            setTasks((prevTasks) => prevTasks.filter(task => task._id !== deletedTaskId));
+            // Close the panel if the selected task was just deleted
+            setSelectedTask((prevSelected) =>
+                prevSelected && prevSelected._id === deletedTaskId ? null : prevSelected
+            );
+        };
+
+        socket.on('taskUpdated', handleTaskUpdated);
+        socket.on('taskCreated', handleTaskCreated);
+        socket.on('taskDeleted', handleTaskDeleted);
+
+        // Cleanup function
+        return () => {
+            if (projectId) {
+                socket.emit('leaveProject', projectId);
+            }
+            socket.off('taskUpdated', handleTaskUpdated);
+            socket.off('taskCreated', handleTaskCreated);
+            socket.off('taskDeleted', handleTaskDeleted);
+        };
+    }, [socket, projectId]);
 
     // Distribute tasks
     tasks.forEach(task => {
@@ -49,11 +106,11 @@ const Kanban = () => {
         }
     });
 
-    // Accept/Decline Handler (Moved from MyTasks)
+    // Accept/Decline Handler
     const handleResponse = async (taskId, response) => {
         try {
             await api.post(`/task/${taskId}/respond`, { response });
-            fetchTasks(); // Refresh to move task or remove it
+            fetchTasks(); // Refresh or let socket handle it
             alert(`Task ${response}ed successfully`);
         } catch (err) {
             alert(err.response?.data?.message || "Action failed");
@@ -102,7 +159,7 @@ const Kanban = () => {
             <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${selectedTask ? 'mr-[400px]' : ''}`}>
                 <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
 
-                    {/* --- NEW: PENDING INVITATIONS SECTION (Moved Here) --- */}
+                    {/* PENDING INVITATIONS SECTION */}
                     {pendingTasks.length > 0 && (
                         <div className="mb-8 p-6 bg-[#1e293b]/50 border border-yellow-500/20 rounded-xl animate-in fade-in slide-in-from-top-4">
                             <h2 className="text-white font-bold mb-4 flex items-center gap-2">

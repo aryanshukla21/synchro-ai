@@ -25,7 +25,8 @@ class NotificationService {
 
             // emit real time event if socket is initialized
             if (this.io) {
-                this.io.to(recipient.toString()).emit('new-notification', populatedNotify);
+                // FIXED: Changed 'new-notification' to 'newNotification' to match frontend
+                this.io.to(recipient.toString()).emit('newNotification', populatedNotify);
             }
 
             return populatedNotify;

@@ -3,7 +3,8 @@ const Activity = require('../models/Activity');
 const Project = require('../models/Project');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');
 const notificationService = require('../services/notificationServices');
-const sendEmail = require('../services/emailServices'); // Added for email notifications
+const sendEmail = require('../services/emailServices');
+const socketHelper = require('../config/socket'); // ADDED: Import socket helper
 
 // 1. Create Task (Restricted to Project Owner)
 exports.createTask = async (req, res, next) => {
@@ -57,6 +58,9 @@ exports.createTask = async (req, res, next) => {
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
 
+        // ADDED: Emit real-time creation to the project room
+        socketHelper.emitToProjectRoom(projectId, 'taskCreated', populatedTask);
+
         res.status(201).json(new ApiResponse(populatedTask, 'Task created successfully'));
     } catch (error) {
         next(error);
@@ -102,6 +106,9 @@ exports.updateTask = async (req, res, next) => {
         })
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
+
+        // ADDED: Emit real-time update to the project room
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
 
         res.status(200).json(new ApiResponse(task, 'Task updated successfully'));
     } catch (error) {
@@ -154,6 +161,9 @@ exports.respondToTaskAssignment = async (req, res, next) => {
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
 
+        // ADDED: Emit real-time update
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
+
         res.status(200).json(new ApiResponse(task, `Task assignment ${action}ed`));
     } catch (error) {
         next(error);
@@ -194,6 +204,9 @@ exports.updateTaskStatus = async (req, res, next) => {
             action: `Moved "${task.title}" to ${status}`
         });
 
+        // ADDED: Emit real-time status change to trigger drag-and-drop visuals for others
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
+
         res.status(200).json(new ApiResponse(task, `Task status updated to ${status}`));
     } catch (error) {
         next(error);
@@ -203,12 +216,11 @@ exports.updateTaskStatus = async (req, res, next) => {
 // 5. Admin Review Submission (Merge or Decline) -> Notify Assignee + Email
 exports.reviewTaskSubmission = async (req, res, next) => {
     try {
-        const { action } = req.body; // 'Merge' or 'Decline'
+        const { action } = req.body;
         let task = await Task.findById(req.params.id).populate('assignedTo', 'name email');
 
         if (!task) return next(new ApiError('Task not found', 404));
 
-        // Security: Only Task Owner (Admin) can review
         if (task.createdBy.toString() !== req.user._id.toString()) {
             return next(new ApiError('Only task owner can review submissions', 403));
         }
@@ -217,7 +229,7 @@ exports.reviewTaskSubmission = async (req, res, next) => {
             task.status = 'Merged';
             await notificationService.notifyMerge(task.assignedTo._id, req.user._id, task.title);
         } else if (action === 'Decline') {
-            task.status = 'In-Progress'; // Send back for revision
+            task.status = 'In-Progress';
             await notificationService.notify({
                 recipient: task.assignedTo._id,
                 sender: req.user._id,
@@ -232,11 +244,10 @@ exports.reviewTaskSubmission = async (req, res, next) => {
 
         await Activity.create({
             project: task.project,
-            user: req.user._id, // The Admin
+            user: req.user._id,
             action: `${action === 'Merge' ? 'Approved & Merged' : 'Declined'} task: "${task.title}"`
         });
 
-        // EMAIL: Notify Assigned User of the decision
         await sendEmail({
             email: task.assignedTo.email,
             subject: `Update on Task: ${task.title}`,
@@ -244,6 +255,10 @@ exports.reviewTaskSubmission = async (req, res, next) => {
         });
 
         task = await Task.findById(task._id).populate('assignedTo', 'name email avatar').populate('createdBy', 'name');
+
+        // ADDED: Emit real-time update
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
+
         res.status(200).json(new ApiResponse(task, `Submission ${action}d successfully`));
     } catch (error) {
         next(error);
@@ -344,6 +359,9 @@ exports.handleLeaveRequest = async (req, res, next) => {
         task = await Task.findById(task._id)
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
+
+        // ADDED: Emit real-time update so the task un-assigns visually
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
 
         res.status(200).json(new ApiResponse(task, `Leave request ${action}d`));
     } catch (error) {

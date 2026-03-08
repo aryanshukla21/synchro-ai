@@ -5,7 +5,6 @@ const { hashPassword, compareHash } = require('../utils/encryption');
 const sendEmail = require('../services/emailServices');
 const crypto = require('crypto');
 
-
 // Register a user (Step 1: Create Account & Send OTP)
 exports.register = async (req, res, next) => {
     try {

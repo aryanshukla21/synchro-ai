@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Clock, ArrowLeft, Github, Upload,
-    Save, CheckCircle, AlertTriangle, FileText, Play
+    CheckCircle, FileText, Play
 } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
@@ -20,6 +20,7 @@ const TaskWorkPage = () => {
     // Submission State
     const [githubUrl, setGithubUrl] = useState('');
     const [file, setFile] = useState(null);
+    const [comment, setComment] = useState(''); // Added comment state
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Fetch Task
@@ -74,11 +75,8 @@ const TaskWorkPage = () => {
     };
 
     const handleRequestExtension = async () => {
-        // Placeholder for future logic (e.g., open a modal to select new date)
         if (confirm("Send a request to the project owner for more time?")) {
             try {
-                // Assuming you have a route for this, or just a placeholder alert
-                // await api.post(`/task/${id}/request-extension`);
                 showToast('Extension request sent to owner.', 'success');
             } catch (error) {
                 showToast('Failed to send request.', 'error');
@@ -89,8 +87,7 @@ const TaskWorkPage = () => {
     const handleSubmitWork = async (e) => {
         e.preventDefault();
 
-        // --- VALIDATION CHECK ---
-        // Ensure at least one field is provided
+        // Validation Check
         if (!githubUrl.trim() && !file) {
             showToast('You must provide a GitHub Link OR upload a file to submit.', 'error');
             return;
@@ -98,24 +95,38 @@ const TaskWorkPage = () => {
 
         setIsSubmitting(true);
         try {
-            // NOTE: In a real app with file upload, you would use FormData here.
-            // Since we are simulating or using a simplified PUT for now:
+            // Create FormData object to handle multipart/form-data (files + text)
+            const formData = new FormData();
 
-            const submissionPayload = {
-                status: 'Submitted',
-                // For demonstration, we save the link in the task description or a specific field
-                // ideally your backend supports a 'submission' object
-                submissionLink: githubUrl,
-                hasFile: !!file
-            };
+            // Append required fields based on your backend controller
+            formData.append('taskId', id);
 
-            await api.put(`/task/${id}`, submissionPayload);
+            if (githubUrl.trim()) {
+                formData.append('contentUrl', githubUrl.trim());
+            }
 
-            showToast('Work submitted successfully!', 'success');
+            if (file) {
+                // The name 'file' must match what your multer middleware expects e.g., upload.single('file')
+                formData.append('file', file);
+            }
+
+            if (comment.trim()) {
+                formData.append('comment', comment.trim());
+            }
+
+            // POST to the actual submissions route
+            await api.post('/submissions/submit', formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            showToast('Work submitted successfully for review!', 'success');
             navigate(-1);
         } catch (error) {
             console.error(error);
-            showToast('Submission failed', 'error');
+            const errorMessage = error.response?.data?.message || 'Submission failed';
+            showToast(errorMessage, 'error');
         } finally {
             setIsSubmitting(false);
         }
@@ -161,7 +172,7 @@ const TaskWorkPage = () => {
 
                     {/* Quick Actions */}
                     <div className="flex gap-4">
-                        {['To-Do', 'To-do'].includes(task.status) && (
+                        {['To-Do', 'To-todo'].includes(task.status) && (
                             <button
                                 onClick={() => handleUpdateTask({ status: 'In-Progress' })}
                                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"
@@ -185,7 +196,7 @@ const TaskWorkPage = () => {
                     <form onSubmit={handleSubmitWork} className="space-y-6">
                         {/* GitHub URL */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-400 mb-2">GitHub Repository URL</label>
+                            <label className="block text-sm font-bold text-gray-400 mb-2">Repository / Work URL</label>
                             <div className="relative">
                                 <Github className="absolute left-3 top-3.5 text-gray-500" size={20} />
                                 <input
@@ -194,22 +205,18 @@ const TaskWorkPage = () => {
                                     value={githubUrl}
                                     onChange={(e) => setGithubUrl(e.target.value)}
                                     className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-3 pl-10 pr-4 text-white focus:border-indigo-500 outline-none transition"
-                                    // Disable if file is selected (Optional, removes ambiguity)
-                                    disabled={!!file}
                                 />
                             </div>
                         </div>
 
                         {/* File Upload */}
                         <div>
-                            <label className="block text-sm font-bold text-gray-400 mb-2">Upload Files (Zip/Doc/Img)</label>
+                            <label className="block text-sm font-bold text-gray-400 mb-2">Upload File</label>
                             <div className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-[#0f172a]/50 transition cursor-pointer relative ${file ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-600'}`}>
                                 <input
                                     type="file"
                                     onChange={(e) => setFile(e.target.files[0])}
                                     className="absolute inset-0 opacity-0 cursor-pointer"
-                                    // Disable if URL is entered
-                                    disabled={!!githubUrl}
                                 />
                                 {file ? (
                                     <div className="flex items-center gap-2 text-emerald-400">
@@ -223,6 +230,17 @@ const TaskWorkPage = () => {
                                     </>
                                 )}
                             </div>
+                        </div>
+
+                        {/* Comment Section */}
+                        <div>
+                            <label className="block text-sm font-bold text-gray-400 mb-2">Submission Notes</label>
+                            <textarea
+                                placeholder="Add any comments for the reviewer..."
+                                value={comment}
+                                onChange={(e) => setComment(e.target.value)}
+                                className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-3 px-4 text-white focus:border-indigo-500 outline-none transition resize-none h-24"
+                            />
                         </div>
 
                         {/* Submit Button */}
