@@ -37,12 +37,18 @@ const server = http.createServer(app);
 // --- CONFIGURATION ---
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
 
+// Trust proxy is required if you are hosting on Render/Heroku/AWS/Vercel
+// so the rate limiter doesn't block all users sharing the proxy IP.
+app.set('trust proxy', 1);
+
 // Set security HTTP headers
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: false,
+}));
 
 // Limit requests from same API
 const limiter = rateLimit({
-    max: 1000, // Limit each IP to 1000 requests per window (adjustable based on your traffic)
+    max: 1500, // Limit each IP to 1500 requests per window (adjustable based on your traffic)
     windowMs: 60 * 60 * 1000, // 1 Hour
     message: 'Too many requests from this IP, please try again in an hour.',
     standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
@@ -58,7 +64,7 @@ app.use(cors({
 }));
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '10kb' })); // Limit body payload size to 10kb to prevent payload overflow attacks
+app.use(express.json({ limit: '10mb' })); // Limit body payload size to 10kb to prevent payload overflow attacks
 
 // Data sanitization against NoSQL query injection
 // This removes any keys containing prohibited characters like $ or .

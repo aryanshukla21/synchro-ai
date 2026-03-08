@@ -86,15 +86,16 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
     useEffect(() => {
         if (!socket || !task?._id) return;
 
-        // Listen for new incoming comments
         const handleNewComment = (newComment) => {
-            // Only add to state if the comment belongs to the currently open task
             if (newComment.task === task._id) {
-                setComments((prev) => [...prev, newComment]);
+                setComments((prev) => {
+                    // ANTI-DUPLICATION: Check if we already appended this comment from our own API response
+                    if (prev.find(c => c._id === newComment._id)) return prev;
+                    return [...prev, newComment];
+                });
             }
         };
 
-        // Listen for deleted comments
         const handleDeletedComment = (payload) => {
             if (payload.taskId === task._id) {
                 setComments((prev) => prev.filter(c => c._id !== payload.commentId));
@@ -145,18 +146,22 @@ const TaskDetailPanel = ({ task, onClose, onUpdate }) => {
         }
     };
 
-    // Add Comment
+    // Add Comment Handler
     const handleAddComment = async (e) => {
         e.preventDefault();
         if (!newComment.trim()) return;
 
         setIsSubmittingComment(true);
         try {
-            // We only need to POST, the socket listener will catch the returned comment
-            // and add it to our state automatically!
-            await api.post('/comments', {
+            const { data } = await api.post('/comments', {
                 taskId: task._id,
                 text: newComment.trim()
+            });
+
+            // Optimistic UI: Update immediately for a snappy feel
+            setComments((prev) => {
+                if (prev.find(c => c._id === data.data._id)) return prev;
+                return [...prev, data.data];
             });
 
             setNewComment('');
