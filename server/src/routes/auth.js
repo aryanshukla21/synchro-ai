@@ -6,7 +6,8 @@ const {
     getMe,
     forgotPassword,
     resetPassword,
-    updateDetails
+    updateDetails,
+    refreshToken
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../middleware/multerMiddleware');
@@ -16,6 +17,7 @@ const router = express.Router();
 router.post('/register', register);
 router.post('/verify-otp', verifyOtp);
 router.post('/login', login);
+router.post('/refresh', refreshToken);
 router.post('/forgot-password', forgotPassword);
 router.put('/reset-password/:resettoken', resetPassword);
 router.get('/me', protect, getMe);

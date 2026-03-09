@@ -48,21 +48,42 @@ exports.createProject = async (req, res, next) => {
 // get all projects for logged-in user
 exports.getProjects = async (req, res, next) => {
     try {
-        const projects = await Project.find({
+        // Pagination setup
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 20; // 20 projects per page
+        const skip = (page - 1) * limit;
+
+        // Base query: Owner OR Member
+        const query = {
             $or: [
                 { owner: req.user._id },
-                { 'members.user': req.user._id }
-            ],
-            isArchived: false
-        })
-            .populate('owner', 'name email avatar')
-            .populate('members.user', 'name email avatar'); // <--- This must be here
+                { members: req.user._id }
+            ]
+        };
 
-        res.status(200).json(new ApiResponse(projects, 'User projects retrieved successfully'));
+        // Calculate total for pagination metadata
+        const total = await Project.countDocuments(query);
+
+        // Fetch limited results
+        const projects = await Project.find(query)
+            .populate('owner', 'name email avatar')
+            .populate('members', 'name email avatar')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
+
+        const pagination = {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        };
+
+        res.status(200).json(new ApiResponse(projects, 'Projects retrieved successfully', 200, pagination));
     } catch (error) {
         next(error);
     }
-}
+};
 
 // get project by id
 exports.getProjectById = async (req, res, next) => {

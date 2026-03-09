@@ -1,10 +1,11 @@
 const User = require('../models/User');
-const { generateToken } = require('../utils/jwt');
+const { generateToken, generateRefreshToken } = require('../utils/jwt');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');
 const { hashPassword, compareHash } = require('../utils/encryption');
 const { uploadOnCloudinary } = require('../utils/cloudinaryHelper');
 const sendEmail = require('../services/emailServices');
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
 // Register a user (Step 1: Create Account & Send OTP)
 exports.register = async (req, res, next) => {
@@ -101,13 +102,15 @@ exports.verifyOtp = async (req, res, next) => {
 
         // Generate Token and Login
         const token = generateToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
 
         res.status(200).json(new ApiResponse(
             {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
-                token
+                token,
+                refreshToken
             },
             'Account verified and logged in successfully'
         ));
@@ -135,13 +138,15 @@ exports.login = async (req, res, next) => {
 
         if (await compareHash(password, user.password)) {
             const token = generateToken(user._id);
+            const refreshToken = generateRefreshToken(user._id);
 
             res.status(200).json(new ApiResponse(
                 {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
-                    token
+                    token,
+                    refreshToken
                 },
                 'Login successful'
             ));
@@ -270,5 +275,32 @@ exports.updateDetails = async (req, res, next) => {
         res.status(200).json(new ApiResponse(user, 'Profile updated successfully'));
     } catch (error) {
         next(error);
+    }
+};
+
+exports.refreshToken = async (req, res, next) => {
+    try {
+        const { token: incomingRefreshToken } = req.body;
+
+        if (!incomingRefreshToken) {
+            return next(new ApiError('Refresh token is required', 400));
+        }
+
+        // Verify the refresh token
+        // Make sure you have JWT_REFRESH_SECRET defined in your .env file
+        const decoded = jwt.verify(incomingRefreshToken, process.env.JWT_REFRESH_SECRET);
+
+        // Ensure the user still exists in the database
+        const user = await User.findById(decoded.id);
+        if (!user) {
+            return next(new ApiError('User associated with this token no longer exists', 404));
+        }
+
+        // Generate a fresh access token
+        const newToken = generateToken(user._id);
+
+        res.status(200).json(new ApiResponse({ token: newToken }, 'Token refreshed successfully'));
+    } catch (error) {
+        return next(new ApiError('Invalid or expired refresh token. Please log in again.', 401));
     }
 };

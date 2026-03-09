@@ -282,14 +282,37 @@ exports.getTaskById = async (req, res, next) => {
     }
 };
 
+// --- READ OPERATIONS WITH PAGINATION ---
+
 exports.getProjectTasks = async (req, res, next) => {
     try {
-        const tasks = await Task.find({ project: req.params.projectId })
+        // Pagination logic (Defaults to page 1, 50 items per page)
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
+        const skip = (page - 1) * limit;
+
+        const query = { project: req.params.projectId };
+
+        // Count total documents for frontend math
+        const total = await Task.countDocuments(query);
+
+        // Fetch paginated documents
+        const tasks = await Task.find(query)
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(limit);
 
-        res.status(200).json(new ApiResponse(tasks, 'Project tasks retrieved successfully'));
+        const pagination = {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit)
+        };
+
+        // Notice we pass pagination as the 4th argument
+        res.status(200).json(new ApiResponse(tasks, 'Project tasks retrieved successfully', 200, pagination));
     } catch (error) {
         next(error);
     }
@@ -297,16 +320,28 @@ exports.getProjectTasks = async (req, res, next) => {
 
 exports.getMyTasks = async (req, res, next) => {
     try {
-        const tasks = await Task.find({
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.limit, 10) || 50;
+        const skip = (page - 1) * limit;
+
+        const query = {
             assignedTo: req.user._id,
             assignmentStatus: { $ne: 'Declined' }
-        })
+        };
+
+        const total = await Task.countDocuments(query);
+
+        const tasks = await Task.find(query)
             .populate('project', 'title description')
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name')
-            .sort({ deadline: 1 });
+            .sort({ deadline: 1 })
+            .skip(skip)
+            .limit(limit);
 
-        res.status(200).json(new ApiResponse(tasks, 'User tasks fetched successfully'));
+        const pagination = { total, page, limit, totalPages: Math.ceil(total / limit) };
+
+        res.status(200).json(new ApiResponse(tasks, 'User tasks fetched successfully', 200, pagination));
     } catch (error) {
         next(error);
     }
