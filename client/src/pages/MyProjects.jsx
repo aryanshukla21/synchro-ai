@@ -2,29 +2,56 @@ import { useState, useEffect } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
-import { Menu, Folder, Shield, PenTool, Eye, ExternalLink } from 'lucide-react';
+import { Menu, Folder, Shield, PenTool, Eye, ExternalLink, ChevronDown } from 'lucide-react';
 
 const MyProjects = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
     const { user } = useAuth();
+
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const fetchProjects = async () => {
-            try {
-                const { data } = await api.get('/projects');
+    // --- NEW: PAGINATION STATE ---
+    const [page, setPage] = useState(1);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [paginationMeta, setPaginationMeta] = useState(null);
+
+    const fetchProjects = async (pageNumber = 1) => {
+        try {
+            if (pageNumber === 1) setLoading(true);
+            else setLoadingMore(true);
+
+            // Pass page and limit as query parameters
+            const { data } = await api.get(`/projects?page=${pageNumber}&limit=20`);
+
+            if (pageNumber === 1) {
                 setProjects(data.data);
-            } catch (error) {
-                console.error("Failed to load projects", error);
-            } finally {
-                setLoading(false);
+            } else {
+                // Append new projects to the existing array
+                setProjects(prev => [...prev, ...data.data]);
             }
-        };
-        fetchProjects();
+
+            // Save the pagination metadata returned from the backend
+            setPaginationMeta(data.pagination);
+        } catch (error) {
+            console.error("Failed to load projects", error);
+        } finally {
+            setLoading(false);
+            setLoadingMore(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchProjects(1);
     }, []);
 
-    // Helper to determine the User's Role in a specific project
+    const handleLoadMore = () => {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchProjects(nextPage);
+    };
+
+    // Helper to determine the User's Role
     const getMyRole = (project) => {
         if (project.owner._id === user?._id) return 'Owner';
         const member = project.members.find(m => m.user?._id === user?._id);
@@ -34,7 +61,7 @@ const MyProjects = () => {
     // Categorize Projects
     const categories = {
         Owned: projects.filter(p => getMyRole(p) === 'Owner'),
-        'Co-Owned': projects.filter(p => getMyRole(p) === 'Admin'), // Assuming Admin = Co-Owned
+        'Co-Owned': projects.filter(p => getMyRole(p) === 'Admin'),
         Contributor: projects.filter(p => getMyRole(p) === 'Contributor'),
         Viewer: projects.filter(p => getMyRole(p) === 'Viewer'),
     };
@@ -50,27 +77,28 @@ const MyProjects = () => {
 
     return (
         <div className="flex flex-col h-screen bg-[#0f172a] text-gray-300 overflow-hidden font-sans">
-
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-800 flex items-center gap-4 bg-[#0f172a] shrink-0">
-                {!isSidebarOpen && (
-                    <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-[#1e293b] rounded-lg hover:bg-indigo-600 transition text-white">
-                        <Menu size={20} />
-                    </button>
-                )}
-                <h1 className="text-xl font-bold text-white">My Projects</h1>
+            <div className="px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-[#0f172a] shrink-0">
+                <div className="flex items-center gap-4">
+                    {!isSidebarOpen && (
+                        <button onClick={() => setIsSidebarOpen(true)} className="p-2 bg-[#1e293b] rounded-lg hover:bg-indigo-600 transition text-white">
+                            <Menu size={20} />
+                        </button>
+                    )}
+                    <h1 className="text-xl font-bold text-white">My Projects</h1>
+                </div>
             </div>
 
             {/* 2x2 Grid Layout */}
-            <div className="flex-1 overflow-y-auto p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-7xl mx-auto h-full min-h-[600px]">
+            <div className="flex-1 overflow-y-auto p-6 relative">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-7xl mx-auto min-h-[600px] mb-20">
                     {Object.keys(categories).map((key) => {
                         const Config = categoryConfig[key];
                         const Icon = Config.icon;
                         const list = categories[key];
 
                         return (
-                            <div key={key} className={`flex flex-col rounded-xl border ${Config.border} ${Config.bg} overflow-hidden shadow-xl`}>
+                            <div key={key} className={`flex flex-col rounded-xl border ${Config.border} ${Config.bg} overflow-hidden shadow-xl max-h-[500px]`}>
                                 {/* Card Header */}
                                 <div className="px-6 py-4 border-b border-gray-700/50 flex justify-between items-center bg-[#0f172a]/40 backdrop-blur">
                                     <div className="flex items-center gap-3">
@@ -86,11 +114,7 @@ const MyProjects = () => {
                                 <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                     {list.length > 0 ? (
                                         list.map(project => (
-                                            <Link
-                                                to={`/project/${project._id}`}
-                                                key={project._id}
-                                                className="block group relative"
-                                            >
+                                            <Link to={`/project/${project._id}`} key={project._id} className="block group relative">
                                                 <div className="bg-[#1e293b] border border-gray-700 hover:border-indigo-500 rounded-lg p-4 transition-all hover:translate-x-1 hover:shadow-lg">
                                                     <div className="flex justify-between items-start">
                                                         <div>
@@ -114,6 +138,19 @@ const MyProjects = () => {
                         );
                     })}
                 </div>
+
+                {/* --- NEW: LOAD MORE PAGINATION BUTTON --- */}
+                {paginationMeta && paginationMeta.page < paginationMeta.totalPages && (
+                    <div className="flex justify-center pb-10">
+                        <button
+                            onClick={handleLoadMore}
+                            disabled={loadingMore}
+                            className="bg-[#1e293b] hover:bg-gray-800 border border-gray-700 text-white px-6 py-2.5 rounded-full font-bold flex items-center gap-2 transition shadow-lg disabled:opacity-50"
+                        >
+                            {loadingMore ? 'Loading...' : <><ChevronDown size={18} /> Load More Projects</>}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

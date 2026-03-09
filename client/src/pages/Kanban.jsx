@@ -1,20 +1,24 @@
 import { useState, useEffect } from 'react';
-import { useOutletContext, useParams } from 'react-router-dom'; // Imported useParams
+import { useOutletContext, useParams } from 'react-router-dom';
 import api from '../api/axios';
 import TaskCard from '../components/kanban/TaskCard';
 import TaskDetailPanel from '../components/kanban/TaskDetailPanel';
-import { Search, Menu, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
-import { useSocket } from '../contexts/SocketContext'; // Import socket hook
+import { Search, Menu, AlertTriangle, CheckCircle2, XCircle, ChevronDown } from 'lucide-react';
+import { useSocket } from '../contexts/SocketContext';
 
 const Kanban = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
-    const { projectId } = useParams(); // Get projectId from route if applicable
-    const { socket } = useSocket(); // Initialize socket
+    const { projectId } = useParams();
+    const { socket } = useSocket();
     const [tasks, setTasks] = useState([]);
     const [selectedTask, setSelectedTask] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Define Columns
+    // Pagination State
+    const [page, setPage] = useState(1);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [paginationMeta, setPaginationMeta] = useState(null);
+
     const columns = {
         'To-Do': [],
         'In-Progress': [],
@@ -22,58 +26,67 @@ const Kanban = () => {
         'Merged': []
     };
 
-    // Separate list for invites
     const pendingTasks = [];
 
-    const fetchTasks = async () => {
+    const fetchTasks = async (pageNumber = 1) => {
         try {
-            // Adjust this route if you are viewing a specific project vs all user tasks
-            const endpoint = projectId ? `/task/project/${projectId}` : '/task/user/me';
+            if (pageNumber === 1) setLoading(true);
+            else setLoadingMore(true);
+
+            const endpoint = projectId
+                ? `/task/project/${projectId}?page=${pageNumber}&limit=50`
+                : `/task/user/me?page=${pageNumber}&limit=50`;
+
             const { data } = await api.get(endpoint);
-            setTasks(data.data);
+
+            if (pageNumber === 1) {
+                setTasks(data.data);
+            } else {
+                // Prevent duplicate tasks when appending
+                setTasks(prev => {
+                    const existingIds = new Set(prev.map(t => t._id));
+                    const newTasks = data.data.filter(t => !existingIds.has(t._id));
+                    return [...prev, ...newTasks];
+                });
+            }
+            setPaginationMeta(data.pagination);
         } catch (error) {
             console.error("Failed to load tasks", error);
         } finally {
             setLoading(false);
+            setLoadingMore(false);
         }
     };
 
-    // Initial Fetch
+    // CRITICAL FIX 1: Reset page state to 1 whenever the projectId route changes
     useEffect(() => {
-        fetchTasks();
+        setPage(1);
+        fetchTasks(1);
     }, [projectId]);
 
     // Real-Time Socket Connection & Event Listeners
     useEffect(() => {
         if (!socket) return;
 
-        // If we are in a specific project board, join that room.
-        // If not, we rely on the backend sending updates to the user's specific room.
         if (projectId) {
             socket.emit('joinProject', projectId);
         }
 
-        // Listener for when a task is updated (e.g., dragged to a new column)
         const handleTaskUpdated = (updatedTask) => {
             setTasks((prevTasks) =>
                 prevTasks.map(task => task._id === updatedTask._id ? updatedTask : task)
             );
-
-            // Optional: If the updated task is currently selected, update the detail panel
             setSelectedTask((prevSelected) =>
                 prevSelected && prevSelected._id === updatedTask._id ? updatedTask : prevSelected
             );
         };
 
-        // Listener for new task creation
         const handleTaskCreated = (newTask) => {
             setTasks((prevTasks) => [...prevTasks, newTask]);
         };
 
-        // Listener for task deletion
         const handleTaskDeleted = (deletedTaskId) => {
             setTasks((prevTasks) => prevTasks.filter(task => task._id !== deletedTaskId));
-            // Close the panel if the selected task was just deleted
             setSelectedTask((prevSelected) =>
                 prevSelected && prevSelected._id === deletedTaskId ? null : prevSelected
             );
@@ -83,7 +96,6 @@ const Kanban = () => {
         socket.on('taskCreated', handleTaskCreated);
         socket.on('taskDeleted', handleTaskDeleted);
 
-        // Cleanup function
         return () => {
             if (projectId) {
                 socket.emit('leaveProject', projectId);
@@ -94,28 +106,39 @@ const Kanban = () => {
         };
     }, [socket, projectId]);
 
-    // Distribute tasks
-    tasks.forEach(task => {
-        // 1. Pending Invites Logic
-        if (task.assignmentStatus === 'Pending') {
-            pendingTasks.push(task);
-        }
-        // 2. Active Board Logic
-        else if (columns[task.status] && (task.assignmentStatus === 'Active' || task.assignmentStatus === 'Accepted' || !task.assignmentStatus)) {
-            columns[task.status].push(task);
-        }
-    });
+    // Load More Logic
+    const handleLoadMore = () => {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        fetchTasks(nextPage);
+    };
 
     // Accept/Decline Handler
     const handleResponse = async (taskId, response) => {
         try {
             await api.post(`/task/${taskId}/respond`, { response });
-            fetchTasks(); // Refresh or let socket handle it
-            alert(`Task ${response}ed successfully`);
+
+            // CRITICAL FIX 2: Removed fetchTasks(1) here.
+            // If we refetch page 1, we lose paginated data.
+            // The socket.on('taskUpdated') listener will automatically catch 
+            // the assignmentStatus change and update the UI instantly!
+
+            // Optional: You can use a lighter toast notification instead of alert
+            // alert(`Task ${response}ed successfully`); 
         } catch (err) {
             alert(err.response?.data?.message || "Action failed");
         }
     };
+
+    // Distribute tasks
+    tasks.forEach(task => {
+        if (task.assignmentStatus === 'Pending') {
+            pendingTasks.push(task);
+        }
+        else if (columns[task.status] && (task.assignmentStatus === 'Active' || task.assignmentStatus === 'Accepted' || !task.assignmentStatus)) {
+            columns[task.status].push(task);
+        }
+    });
 
     const columnColors = {
         'To-Do': 'border-t-gray-500',
@@ -124,7 +147,7 @@ const Kanban = () => {
         'Merged': 'border-t-emerald-500',
     };
 
-    if (loading) return <div className="p-10 text-white">Loading Board...</div>;
+    if (loading) return <div className="p-10 text-white animate-pulse">Loading Board...</div>;
 
     return (
         <div className="flex flex-col h-[calc(100vh)] bg-[#0f172a] text-gray-300 relative overflow-hidden">
@@ -143,8 +166,18 @@ const Kanban = () => {
                     <h1 className="text-xl font-bold text-white">Kanban Board</h1>
                 </div>
 
-                {/* Search & Actions */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 items-center">
+                    {/* LOAD MORE BUTTON */}
+                    {paginationMeta && paginationMeta.page < paginationMeta.totalPages && (
+                        <button
+                            onClick={handleLoadMore}
+                            disabled={loadingMore}
+                            className="bg-[#1e293b] hover:bg-gray-800 border border-gray-700 text-xs text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition disabled:opacity-50 mr-2"
+                        >
+                            {loadingMore ? 'Loading...' : <><ChevronDown size={14} /> Load Older Tasks</>}
+                        </button>
+                    )}
+
                     <div className="relative hidden sm:block">
                         <Search className="absolute left-3 top-2.5 text-gray-500" size={16} />
                         <input
