@@ -43,7 +43,7 @@ const ManageTeamModal = ({ isOpen, onClose, members, currentUser, isOwner, onRem
                             className="bg-[#0f172a] border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-indigo-500 outline-none"
                         >
                             <option value="Contributor">Contributor</option>
-                            <option value="Reviewer">Reviewer</option>
+                            <option value="Viewer">Viewer</option>
                             <option value="Co-Owner">Co-Owner</option>
                         </select>
                         <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">

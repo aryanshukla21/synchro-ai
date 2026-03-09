@@ -70,4 +70,4 @@ class ProjectService {
     }
 }
 
-module.exports = ProjectService();
+module.exports = new ProjectService();

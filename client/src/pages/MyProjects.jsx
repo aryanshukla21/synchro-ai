@@ -61,7 +61,7 @@ const MyProjects = () => {
     // Categorize Projects
     const categories = {
         Owned: projects.filter(p => getMyRole(p) === 'Owner'),
-        'Co-Owned': projects.filter(p => getMyRole(p) === 'Admin'),
+        'Co-Owned': projects.filter(p => getMyRole(p) === 'Co-Owner'),
         Contributor: projects.filter(p => getMyRole(p) === 'Contributor'),
         Viewer: projects.filter(p => getMyRole(p) === 'Viewer'),
     };

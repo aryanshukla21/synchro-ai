@@ -5,7 +5,10 @@ const {
     getProjectById,
     inviteMember,
     deleteProject,
-    updateProject
+    updateProject,
+    acceptInvite,
+    rejectInvite,
+    removeMember
 } = require('../controllers/projects.controller');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -21,5 +24,8 @@ router.route('/:id')
     .delete(protect, deleteProject);
 
 router.post('/:id/invite', protect, inviteMember);
+router.patch('/:id/accept', protect, acceptInvite);
+router.delete('/:id/leave', protect, rejectInvite);
+router.delete('/:id/members/:memberId', protect, removeMember);
 
 module.exports = router;

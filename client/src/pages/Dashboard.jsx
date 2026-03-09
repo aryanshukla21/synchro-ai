@@ -46,8 +46,8 @@ const Dashboard = () => {
     const fetchData = async () => {
         try {
             const [projectsRes, tasksRes] = await Promise.all([
-                api.get('/projects'),
-                api.get('/task/user/me')
+                api.get('/projects?limit=1000'),
+                api.get('/task/user/me?limit=10000')
             ]);
             setProjects(projectsRes.data?.data || []);
             setMyTasks(tasksRes.data?.data || []);
@@ -241,7 +241,7 @@ const Dashboard = () => {
                                             <p className="text-[10px] text-gray-500 truncate">{task.project?.name || task.project?.title || 'Unknown Project'}</p>
                                         </div>
                                         <span className={`text-[10px] px-2 py-0.5 rounded border ${task.status === 'Merged' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                                'bg-gray-700/50 text-gray-400 border-gray-600'
+                                            'bg-gray-700/50 text-gray-400 border-gray-600'
                                             }`}>
                                             {task.status}
                                         </span>

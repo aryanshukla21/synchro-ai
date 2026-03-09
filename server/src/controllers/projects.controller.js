@@ -67,7 +67,7 @@ exports.getProjects = async (req, res, next) => {
         // Fetch limited results
         const projects = await Project.find(query)
             .populate('owner', 'name email avatar')
-            .populate('members', 'name email avatar')
+            .populate('members.user', 'name email avatar')
             .sort({ createdAt: -1 })
             .skip(skip)
             .limit(limit);
