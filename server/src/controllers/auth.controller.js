@@ -247,6 +247,10 @@ exports.resetPassword = async (req, res, next) => {
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
 
+        // CRITICAL FIX: Convert them to a standard account so they can log in 
+        // normally with this new password, even if they originally used Google.
+        user.authProvider = 'local';
+
         await user.save();
 
         res.status(200).json(new ApiResponse(null, 'Password updated successfully'));
