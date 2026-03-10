@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 
 const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const { login } = useAuth();
+    const { login, googleLogin } = useAuth(); // Import googleLogin from context
     const navigate = useNavigate();
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -70,7 +71,7 @@ const Login = () => {
                     <div>
                         <div className="flex items-center justify-between mb-1.5">
                             <label className="block text-sm font-medium text-gray-300">Password</label>
-                            <a href="#" className="text-xs text-indigo-400 hover:text-indigo-300">Forgot password?</a>
+                            <Link to="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300">Forgot password?</Link>
                         </div>
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
@@ -99,6 +100,43 @@ const Login = () => {
                         )}
                     </button>
                 </form>
+
+                {/* --- GOOGLE OAUTH SECTION --- */}
+                <div className="mt-6">
+                    <div className="relative mb-6">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-gray-700"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-2 bg-[#1e293b] text-gray-400">Or continue with</span>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-center">
+                        <GoogleLogin
+                            onSuccess={async (credentialResponse) => {
+                                try {
+                                    setLoading(true);
+                                    const isNewUser = await googleLogin(credentialResponse.credential);
+                                    if (isNewUser) {
+                                        navigate('/setup-password');
+                                    } else {
+                                        navigate('/dashboard');
+                                    }
+                                } catch (error) {
+                                    setError('Google Auth failed. Please try again.');
+                                } finally {
+                                    setLoading(false);
+                                }
+                            }}
+                            onError={() => {
+                                setError('Google login was unsuccessful.');
+                            }}
+                            theme="filled_black"
+                            shape="pill"
+                        />
+                    </div>
+                </div>
 
                 <p className="mt-8 text-center text-sm text-gray-400">
                     Don't have an account?{' '}

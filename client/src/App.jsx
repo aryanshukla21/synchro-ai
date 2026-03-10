@@ -13,6 +13,7 @@ import ResetPassword from './pages/ResetPassword';
 import MyProjects from './pages/MyProjects';
 import MyProfile from './pages/MyProfile';
 import TaskWorkPage from './pages/TaskWorkPage';
+import SetupPassword from './pages/SetupPassword';
 
 import { ToastProvider } from './contexts/ToastContext';
 
@@ -56,6 +57,8 @@ function App() {
             <Route path="/project/:id" element={<ProjectDetails />} />
             <Route path="/profile" element={<MyProfile />} />
             <Route path="/task/:id/work" element={<TaskWorkPage />} />
+
+            <Route path="/setup-password" element={<SetupPassword />} />
           </Route>
 
           <Route path="/forgot-password" element={<ForgotPassword />} />
