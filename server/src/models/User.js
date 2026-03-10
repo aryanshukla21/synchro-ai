@@ -16,9 +16,13 @@ const userSchema = new mongoose.Schema({
     },
     password: {
         type: String,
-        required: [true, 'Please provide a password'],
         minlength: 6,
         select: false
+    },
+    authProvider: {
+        type: String,
+        enum: ['local', 'google'],
+        default: 'local'
     },
     avatar: {
         type: String,
@@ -38,8 +42,8 @@ const userSchema = new mongoose.Schema({
         select: false
     },
     isVerified: {
-        type: String,
-        default: "false"
+        type: Boolean,
+        default: false
     },
     resetPasswordToken: String,
     resetPasswordExpire: Date

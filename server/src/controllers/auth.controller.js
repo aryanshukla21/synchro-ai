@@ -6,6 +6,9 @@ const { uploadOnCloudinary } = require('../utils/cloudinaryHelper');
 const sendEmail = require('../services/emailServices');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Register a user (Step 1: Create Account & Send OTP)
 exports.register = async (req, res, next) => {
@@ -34,7 +37,8 @@ exports.register = async (req, res, next) => {
             skills: skills || [],
             otp,
             otpExpires,
-            isVerified: "false"
+            isVerified: false,
+            authProvider: 'local'
         });
 
         // Send OTP via Email
@@ -95,7 +99,7 @@ exports.verifyOtp = async (req, res, next) => {
         }
 
         // OTP is valid
-        user.isVerified = "true";
+        user.isVerified = true;
         user.otp = undefined;
         user.otpExpires = undefined;
         await user.save();
@@ -109,6 +113,7 @@ exports.verifyOtp = async (req, res, next) => {
                 _id: user._id,
                 name: user.name,
                 email: user.email,
+                avatar: user.avatar,
                 token,
                 refreshToken
             },
@@ -136,6 +141,11 @@ exports.login = async (req, res, next) => {
             return next(new ApiError('Account not verified. Please check your email for OTP.', 403));
         }
 
+        // CRITICAL FIX: Prevent bcrypt crash if a Google OAuth user tries to login with a standard password
+        if (!user.password) {
+            return next(new ApiError('Please sign in with Google or reset your password to create one.', 401));
+        }
+
         if (await compareHash(password, user.password)) {
             const token = generateToken(user._id);
             const refreshToken = generateRefreshToken(user._id);
@@ -145,6 +155,7 @@ exports.login = async (req, res, next) => {
                     _id: user._id,
                     name: user.name,
                     email: user.email,
+                    avatar: user.avatar,
                     token,
                     refreshToken
                 },
@@ -184,8 +195,7 @@ exports.forgotPassword = async (req, res, next) => {
         await user.save({ validateBeforeSave: false });
 
         // Create reset URL
-        // NOTE: This points to your FRONTEND URL
-        const resetUrl = `http://localhost:5173/reset-password/${resetToken}`;
+        const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:5173'}/reset-password/${resetToken}`;
 
         const message = `
             You are receiving this email because you (or someone else) has requested the reset of a password.
@@ -239,7 +249,7 @@ exports.resetPassword = async (req, res, next) => {
 
         await user.save();
 
-        res.status(200).json(new ApiResponse(null, 'Password updated success'));
+        res.status(200).json(new ApiResponse(null, 'Password updated successfully'));
     } catch (error) {
         next(error);
     }
@@ -247,16 +257,17 @@ exports.resetPassword = async (req, res, next) => {
 
 exports.updateDetails = async (req, res, next) => {
     try {
-        const fieldsToUpdate = {
-            name: req.body.name,
-        };
+        const fieldsToUpdate = {};
+
+        // Prevent overwriting name with undefined if only avatar is uploaded
+        if (req.body.name) fieldsToUpdate.name = req.body.name;
 
         // When using FormData, arrays are sent as comma-separated strings. We must parse it.
         if (req.body.skills) {
             fieldsToUpdate.skills = req.body.skills.split(',').map(s => s.trim()).filter(s => s);
         }
 
-        // --- NEW: CLOUDINARY AVATAR UPLOAD LOGIC ---
+        // Local upload only (Cloudinary)
         if (req.file) {
             const cloudinaryResponse = await uploadOnCloudinary(req.file.path, 'avatars');
             if (cloudinaryResponse) {
@@ -266,7 +277,6 @@ exports.updateDetails = async (req, res, next) => {
             }
         }
 
-        // Note: Using req.user._id instead of req.user.id for consistency
         const user = await User.findByIdAndUpdate(req.user._id, fieldsToUpdate, {
             new: true,
             runValidators: true
@@ -286,21 +296,81 @@ exports.refreshToken = async (req, res, next) => {
             return next(new ApiError('Refresh token is required', 400));
         }
 
-        // Verify the refresh token
-        // Make sure you have JWT_REFRESH_SECRET defined in your .env file
         const decoded = jwt.verify(incomingRefreshToken, process.env.JWT_REFRESH_SECRET);
 
-        // Ensure the user still exists in the database
         const user = await User.findById(decoded.id);
         if (!user) {
             return next(new ApiError('User associated with this token no longer exists', 404));
         }
 
-        // Generate a fresh access token
         const newToken = generateToken(user._id);
 
         res.status(200).json(new ApiResponse({ token: newToken }, 'Token refreshed successfully'));
     } catch (error) {
         return next(new ApiError('Invalid or expired refresh token. Please log in again.', 401));
+    }
+};
+
+// --- GOOGLE OAUTH VERIFICATION ---
+exports.googleAuth = async (req, res, next) => {
+    try {
+        const { credential } = req.body;
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken: credential,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const { email, name, picture } = ticket.getPayload();
+
+        let user = await User.findOne({ email });
+        let isNewGoogleUser = false;
+
+        if (!user) {
+            user = await User.create({
+                name,
+                email,
+                avatar: picture,
+                authProvider: 'google',
+                isVerified: true
+            });
+            isNewGoogleUser = true;
+        } else if (!user.isVerified) {
+            user.isVerified = true;
+            await user.save();
+        }
+
+        const token = generateToken(user._id);
+        const refreshToken = generateRefreshToken(user._id);
+
+        res.status(200).json(new ApiResponse({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            avatar: user.avatar,
+            token,
+            refreshToken,
+            isNewGoogleUser
+        }, 'Google Authentication successful'));
+    } catch (error) {
+        return next(new ApiError('Google authentication failed', 400));
+    }
+};
+
+// --- SUBSEQUENT PASSWORD SETUP ---
+exports.setAccountPassword = async (req, res, next) => {
+    try {
+        const { password } = req.body;
+        if (!password) return next(new ApiError('Password is required', 400));
+
+        const user = await User.findById(req.user._id).select('+password');
+
+        user.password = await hashPassword(password);
+        user.authProvider = 'local';
+        await user.save();
+
+        res.status(200).json(new ApiResponse(null, 'Password secured successfully'));
+    } catch (error) {
+        next(error);
     }
 };
