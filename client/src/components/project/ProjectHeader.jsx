@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
     Plus, MoreVertical, ChevronRight,
-    Settings, X, Save, Pen, Loader2
+    Settings, X, Save, Loader2,
+    Download, FileText, Table
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
 import NotificationBell from '../NotificationBell';
 
-const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner }) => {
+const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExportPDF, onExportCSV }) => {
     const { showToast } = useToast();
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [showExportMenu, setShowExportMenu] = useState(false);
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -50,19 +52,50 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner }) => {
 
     return (
         <>
-            {/* Added relative and z-40 to ensure the header stays above the main content area */}
             <header className="h-16 border-b border-gray-800 bg-[#0f172a]/95 backdrop-blur flex items-center justify-between px-6 shrink-0 relative z-40">
-                {/* Left: Breadcrumbs */}
                 <div className="flex items-center gap-2 text-sm text-gray-400">
                     <Link to="/" className="hover:text-white transition">Dashboard</Link>
                     <ChevronRight size={14} />
                     <span className="text-white font-medium truncate max-w-[200px]">
-                        {project?.title}
+                        {project?.title || project?.name}
                     </span>
                 </div>
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-3">
+
+                    <div className="relative">
+                        {/* Trigger Button */}
+                        <button
+                            onClick={() => setShowExportMenu(!showExportMenu)}
+                            className="flex items-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-sm font-medium rounded-lg border border-gray-600 transition"
+                        >
+                            <Download size={16} />
+                            <span className="hidden sm:inline">Export</span>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {showExportMenu && (
+                            <div className="absolute right-0 mt-2 w-48 bg-[#0f172a] border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                                {/* Export to PDF Option */}
+                                <button
+                                    onClick={() => { onExportPDF(); setShowExportMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-indigo-600/20 hover:text-white transition text-left border-b border-gray-800"
+                                >
+                                    <FileText size={16} className="text-red-400" />
+                                    Export as PDF
+                                </button>
+                                {/* Export to CSV Option */}
+                                <button
+                                    onClick={() => { onExportCSV(); setShowExportMenu(false); }}
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-indigo-600/20 hover:text-white transition text-left"
+                                >
+                                    <Table size={16} className="text-emerald-400" />
+                                    Export as CSV
+                                </button>
+                            </div>
+                        )}
+                    </div>
 
                     <NotificationBell />
 

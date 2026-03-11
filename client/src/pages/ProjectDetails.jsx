@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
+import { generatePDF, generateCSV } from '../utils/reportGenerator'; // <--- NEW IMPORT
 
 // Components
 import ProjectHeader from '../components/project/ProjectHeader';
@@ -172,6 +173,18 @@ const ProjectDetails = () => {
         submitted: tasks.filter(t => t.status === 'Submitted').length,
     };
 
+    // --- EXPORT HANDLERS ---
+    const handleExportPDF = () => {
+        const stats = { progressPercentage, totalTasks, completedTasks, tasksByStatus };
+        generatePDF(project, tasks, stats);
+        showToast("PDF Report generated!", "success");
+    };
+
+    const handleExportCSV = () => {
+        generateCSV(project, tasks);
+        showToast("CSV Export generated!", "success");
+    };
+
     return (
         <div className="flex-1 flex flex-col h-full bg-[#0f172a] overflow-hidden font-sans">
             <ProjectHeader
@@ -179,6 +192,8 @@ const ProjectDetails = () => {
                 onTaskCreate={() => setShowCreateTask(true)}
                 onUpdateProject={handleUpdateProject}
                 isOwner={isOwner}
+                onExportPDF={handleExportPDF} // <--- Pass down handler
+                onExportCSV={handleExportCSV} // <--- Pass down handler
             />
 
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-700">
