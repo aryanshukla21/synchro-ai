@@ -1,20 +1,25 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
+
+// Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProjectDetails from './pages/ProjectDetails';
-// import MyTasks from './pages/MyTasks';
 import Kanban from './pages/Kanban';
-import NotFound from './pages/NotFound'; // <--- Import this
-import Layout from './components/Layout';
-import ForgotPassword from './pages/ForgotPassword'; // Import
+import NotFound from './pages/NotFound';
+import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import MyProjects from './pages/MyProjects';
 import MyProfile from './pages/MyProfile';
 import TaskWorkPage from './pages/TaskWorkPage';
 import SetupPassword from './pages/SetupPassword';
+import ProjectReviews from './pages/ProjectReviews';
+import Settings from './pages/Settings';
+import JoinWorkspace from './pages/JoinWorkspace';
 
+// Components & Contexts
+import Layout from './components/Layout';
 import { ToastProvider } from './contexts/ToastContext';
 
 const PrivateRoute = ({ children }) => {
@@ -35,6 +40,7 @@ function App() {
     <ToastProvider>
       <div className="min-h-screen bg-[#0f172a] text-gray-300">
         <Routes>
+          {/* Public Routes */}
           <Route path="/login" element={
             <PublicRoute>
               <Login />
@@ -47,7 +53,11 @@ function App() {
             </PublicRoute>
           } />
 
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
 
+          {/* Universal Route (Accessible to both logged-in and logged-out users) */}
+          <Route path="/join-workspace/:token" element={<JoinWorkspace />} />
 
           {/* Protected Routes */}
           <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
@@ -55,14 +65,12 @@ function App() {
             <Route path="/my-projects" element={<MyProjects />} />
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/project/:id" element={<ProjectDetails />} />
+            <Route path="/project/:projectId/reviews" element={<ProjectReviews />} />
             <Route path="/profile" element={<MyProfile />} />
             <Route path="/task/:id/work" element={<TaskWorkPage />} />
-
+            <Route path="/project/:projectId/settings" element={<Settings />} />
             <Route path="/setup-password" element={<SetupPassword />} />
           </Route>
-
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
 
           {/* Catch-all Route for 404 - MUST BE LAST */}
           <Route path="*" element={<NotFound />} />

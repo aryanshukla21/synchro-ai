@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, Folder, CheckSquare, Settings, X, LogOut } from 'lucide-react'; // Changed List to Folder
+import { LayoutGrid, Folder, CheckSquare, X, LogOut } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -40,7 +40,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                     active={isActive('/')}
                 />
 
-                {/* UPDATED LINK */}
                 <NavItem
                     to="/my-projects"
                     icon={<Folder size={20} />}
@@ -53,13 +52,6 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<CheckSquare size={20} />}
                     label="Kanban Board"
                     active={isActive('/kanban')}
-                />
-
-                <NavItem
-                    to="/settings"
-                    icon={<Settings size={20} />}
-                    label="Settings"
-                    active={isActive('/settings')}
                 />
             </nav>
 

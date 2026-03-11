@@ -8,7 +8,7 @@ import {
     Layout, CheckCircle2, AlertCircle
 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
-import NotificationBell from '../components/NotificationBell'; // Import the working Bell component
+import NotificationBell from '../components/NotificationBell';
 
 const Dashboard = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
@@ -233,20 +233,30 @@ const Dashboard = () => {
                         </div>
                         <div className="p-2 overflow-y-auto custom-scrollbar">
                             {myTasks.length > 0 ? (
-                                myTasks.slice(0, 8).map(task => (
-                                    <div key={task._id} className="p-3 rounded-lg hover:bg-gray-700/50 transition flex items-start gap-3 group cursor-pointer border-b border-gray-800/50 last:border-0">
-                                        <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${task.priority === 'High' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="text-sm font-medium text-gray-200 truncate group-hover:text-indigo-400 transition">{task.title}</h4>
-                                            <p className="text-[10px] text-gray-500 truncate">{task.project?.name || task.project?.title || 'Unknown Project'}</p>
-                                        </div>
-                                        <span className={`text-[10px] px-2 py-0.5 rounded border ${task.status === 'Merged' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                                            'bg-gray-700/50 text-gray-400 border-gray-600'
-                                            }`}>
-                                            {task.status}
-                                        </span>
-                                    </div>
-                                ))
+                                myTasks.slice(0, 8).map(task => {
+                                    const isReviewing = task.status === 'Review-Requested';
+                                    const isMerged = task.status === 'Merged';
+
+                                    return (
+                                        <Link
+                                            key={task._id}
+                                            to={`/task/${task._id}/work`}
+                                            className={`p-3 rounded-lg hover:bg-gray-700/50 transition flex items-start gap-3 group cursor-pointer border-b border-gray-800/50 last:border-0 ${isReviewing ? 'bg-emerald-900/10 border-l-2 border-l-emerald-500' : ''}`}
+                                        >
+                                            <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${task.priority === 'High' ? 'bg-red-500' : 'bg-blue-500'}`}></div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-sm font-medium text-gray-200 truncate group-hover:text-indigo-400 transition">{task.title}</h4>
+                                                <p className="text-[10px] text-gray-500 truncate">{task.project?.name || task.project?.title || 'Unknown Project'}</p>
+                                            </div>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded border whitespace-nowrap ${isMerged ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                                isReviewing ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                                    'bg-gray-700/50 text-gray-400 border-gray-600'
+                                                }`}>
+                                                {task.status}
+                                            </span>
+                                        </Link>
+                                    );
+                                })
                             ) : (
                                 <div className="p-8 text-center text-gray-500 text-sm flex flex-col items-center">
                                     <CheckCircle2 size={32} className="mb-2 opacity-50" />

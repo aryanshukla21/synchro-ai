@@ -8,7 +8,9 @@ const {
     updateProject,
     acceptInvite,
     rejectInvite,
-    removeMember
+    removeMember,
+    updateIntegrations,
+    updateNotifications
 } = require('../controllers/projects.controller');
 const { protect } = require('../middleware/authMiddleware');
 
@@ -39,6 +41,12 @@ router.post('/:id/invite', protect, authorizeRoles('Owner', 'Co-Owner'), inviteM
 // Pending users are not strictly active members yet, so we don't apply authorizeRoles here
 router.patch('/:id/accept', protect, acceptInvite);
 router.delete('/:id/leave', protect, rejectInvite);
+
+// Update API integrations (Only Owners/Co-Owners)
+router.put('/:id/integrations', protect, authorizeRoles('Owner', 'Co-Owner'), updateIntegrations);
+
+// Update Webhook Notifications (Only Owners/Co-Owners)
+router.put('/:id/notifications', protect, authorizeRoles('Owner', 'Co-Owner'), updateNotifications);
 
 // Only Owners and Co-Owners can kick people out
 router.delete('/:id/members/:memberId', protect, authorizeRoles('Owner', 'Co-Owner'), removeMember);

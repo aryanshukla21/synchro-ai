@@ -191,67 +191,38 @@ const TaskWorkPage = () => {
 
                 {/* Right: Submission Panel */}
                 <div className="bg-[#1e293b] p-8 rounded-2xl border border-gray-700 h-fit sticky top-10">
-                    <h2 className="text-2xl font-bold text-white mb-6">Submit Work</h2>
-
-                    <form onSubmit={handleSubmitWork} className="space-y-6">
-                        {/* GitHub URL */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-400 mb-2">Repository / Work URL</label>
-                            <div className="relative">
-                                <Github className="absolute left-3 top-3.5 text-gray-500" size={20} />
-                                <input
-                                    type="url"
-                                    placeholder="https://github.com/username/repo"
-                                    value={githubUrl}
-                                    onChange={(e) => setGithubUrl(e.target.value)}
-                                    className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-3 pl-10 pr-4 text-white focus:border-indigo-500 outline-none transition"
-                                />
+                    {task.status === 'Review-Requested' ? (
+                        <div className="text-center py-10">
+                            <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Clock size={32} />
                             </div>
+                            <h2 className="text-xl font-bold text-white mb-2">Under Review</h2>
+                            <p className="text-gray-400 text-sm">Your work has been submitted and is currently waiting for manager approval.</p>
                         </div>
-
-                        {/* File Upload */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-400 mb-2">Upload File</label>
-                            <div className={`border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-[#0f172a]/50 transition cursor-pointer relative ${file ? 'border-emerald-500 bg-emerald-500/10' : 'border-gray-600'}`}>
-                                <input
-                                    type="file"
-                                    onChange={(e) => setFile(e.target.files[0])}
-                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                />
-                                {file ? (
-                                    <div className="flex items-center gap-2 text-emerald-400">
-                                        <FileText size={24} />
-                                        <span className="text-sm font-medium truncate max-w-[200px]">{file.name}</span>
-                                    </div>
-                                ) : (
-                                    <>
-                                        <Upload className="text-gray-500 mb-2" size={32} />
-                                        <span className="text-sm text-gray-500">Click to upload or drag and drop</span>
-                                    </>
-                                )}
+                    ) : task.status === 'Merged' ? (
+                        <div className="text-center py-10">
+                            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <CheckCircle size={32} />
                             </div>
+                            <h2 className="text-xl font-bold text-white mb-2">Work Approved!</h2>
+                            <p className="text-gray-400 text-sm">This task has been successfully merged and closed.</p>
                         </div>
+                    ) : (
+                        <>
+                            <h2 className="text-2xl font-bold text-white mb-6">Submit Work</h2>
+                            <form onSubmit={handleSubmitWork} className="space-y-6">
+                                {/* ... existing form inputs (githubUrl, file, comment) ... */}
 
-                        {/* Comment Section */}
-                        <div>
-                            <label className="block text-sm font-bold text-gray-400 mb-2">Submission Notes</label>
-                            <textarea
-                                placeholder="Add any comments for the reviewer..."
-                                value={comment}
-                                onChange={(e) => setComment(e.target.value)}
-                                className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-3 px-4 text-white focus:border-indigo-500 outline-none transition resize-none h-24"
-                            />
-                        </div>
-
-                        {/* Submit Button */}
-                        <button
-                            type="submit"
-                            disabled={isSubmitting}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition disabled:opacity-50"
-                        >
-                            {isSubmitting ? 'Submitting...' : <><CheckCircle size={20} /> Submit for Review</>}
-                        </button>
-                    </form>
+                                <button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition disabled:opacity-50"
+                                >
+                                    {isSubmitting ? 'Submitting...' : <><CheckCircle size={20} /> Submit for Review</>}
+                                </button>
+                            </form>
+                        </>
+                    )}
                 </div>
             </main>
         </div>

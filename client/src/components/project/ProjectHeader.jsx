@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import {
     Plus, MoreVertical, ChevronRight,
     Settings, X, Save, Loader2,
-    Download, FileText, Table
+    Download, FileText, Table, ClipboardCheck
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
@@ -101,13 +101,22 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
 
                     {isOwner && (
                         <>
-                            <button
-                                onClick={() => setIsEditModalOpen(true)}
+                            {/* Review Submissions Button */}
+                            <Link
+                                to={`/project/${project?._id}/reviews`}
+                                className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-emerald-500/30 transition"
+                            >
+                                <ClipboardCheck size={18} />
+                                <span className="hidden sm:inline">Review Submissions</span>
+                            </Link>
+
+                            <Link
+                                to={`/project/${project?._id}/settings`}
                                 className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-700 transition"
                             >
                                 <Settings size={18} />
                                 <span className="hidden sm:inline">Settings</span>
-                            </button>
+                            </Link>
 
                             <button
                                 onClick={onTaskCreate}

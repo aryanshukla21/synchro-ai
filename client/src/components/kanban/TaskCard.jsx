@@ -1,4 +1,4 @@
-import { MessageSquare, Paperclip } from 'lucide-react';
+import { MessageSquare, Paperclip, ClipboardCheck } from 'lucide-react';
 
 const TaskCard = ({ task, onClick }) => {
     const priorityColors = {
@@ -12,21 +12,35 @@ const TaskCard = ({ task, onClick }) => {
     const commentCount = task.commentCount || task.comments?.length || 0;
     const attachmentCount = task.attachmentCount || task.attachments?.length || 0;
 
+    // Highlight tasks that need manager review
+    const needsReview = task.status === 'Review-Requested';
+
     return (
         <div
             onClick={() => onClick(task)}
-            className="bg-[#1e293b] p-4 rounded-xl border border-gray-700 shadow-sm hover:border-indigo-500/50 cursor-pointer transition-all group"
+            className={`p-4 rounded-xl border shadow-sm cursor-pointer transition-all group ${needsReview
+                ? 'bg-[#1e293b] border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.1)] hover:border-emerald-400'
+                : 'bg-[#1e293b] border-gray-700 hover:border-indigo-500/50'
+                }`}
         >
             <div className="flex justify-between items-start mb-3">
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${priorityColors[task.priority] || priorityColors.Medium}`}>
                     {task.priority?.toUpperCase() || 'MEDIUM'}
                 </span>
+
                 {task.assignedTo && (
-                    <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] text-white font-bold">
+                    <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] text-white font-bold" title={task.assignedTo.name}>
                         {task.assignedTo.name?.charAt(0) || 'U'}
                     </div>
                 )}
             </div>
+
+            {/* Review Badge */}
+            {needsReview && (
+                <div className="mb-2 w-fit px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <ClipboardCheck size={12} /> Needs Review
+                </div>
+            )}
 
             <h4 className="text-gray-200 font-medium text-sm mb-3 line-clamp-2">
                 {task.title}

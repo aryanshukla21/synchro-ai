@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { User, Mail, Lock, ArrowRight, AlertCircle, CheckCircle2, KeyRound } from 'lucide-react';
 import { GoogleLogin } from '@react-oauth/google';
+import api from '../api/axios';
 
 const Register = () => {
     // Step 1: Register Details, Step 2: OTP
@@ -12,6 +13,11 @@ const Register = () => {
 
     const { register, verifyOtp, googleLogin } = useAuth();
     const navigate = useNavigate();
+
+    // Extract inviteToken from URL
+    const [searchParams] = useSearchParams();
+    const inviteToken = searchParams.get('inviteToken');
+
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
@@ -35,6 +41,16 @@ const Register = () => {
         setLoading(true);
         try {
             await verifyOtp(formData.email, otp);
+
+            // If they registered via an invite link, automatically accept it now
+            if (inviteToken) {
+                try {
+                    await api.post('/workspace/accept-invite', { token: inviteToken });
+                } catch (inviteErr) {
+                    console.error("Failed to automatically join workspace:", inviteErr);
+                }
+            }
+
             navigate('/'); // Success! Go to dashboard
         } catch (err) {
             setError(err.response?.data?.message || 'Verification failed');
@@ -56,7 +72,10 @@ const Register = () => {
                         {step === 1 ? 'Create Account' : 'Verify Email'}
                     </h2>
                     <p className="text-gray-400">
-                        {step === 1 ? 'Join Synchro-AI and start collaborating' : `We sent a code to ${formData.email}`}
+                        {/* Dynamic text if they are registering from an invite link */}
+                        {step === 1
+                            ? (inviteToken ? 'Create an account to join the workspace' : 'Join Synchro-AI and start collaborating')
+                            : `We sent a code to ${formData.email}`}
                     </p>
                 </div>
 
@@ -152,10 +171,20 @@ const Register = () => {
                                         try {
                                             setLoading(true);
                                             const isNewUser = await googleLogin(credentialResponse.credential);
+
+                                            // Handle workspace invite for Google signups
+                                            if (inviteToken) {
+                                                try {
+                                                    await api.post('/workspace/accept-invite', { token: inviteToken });
+                                                } catch (inviteErr) {
+                                                    console.error("Failed to automatically join workspace:", inviteErr);
+                                                }
+                                            }
+
                                             if (isNewUser) {
                                                 navigate('/setup-password');
                                             } else {
-                                                navigate('/dashboard');
+                                                navigate('/');
                                             }
                                         } catch (err) {
                                             setError('Google Signup failed. Please try again.');
@@ -218,7 +247,8 @@ const Register = () => {
                 {step === 1 && (
                     <p className="mt-8 text-center text-sm text-gray-400">
                         Already have an account?{' '}
-                        <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline">
+                        {/* Preserve the invite token if they switch to the login page */}
+                        <Link to={inviteToken ? `/login?returnUrl=/join-workspace/${inviteToken}` : '/login'} className="text-indigo-400 hover:text-indigo-300 font-medium hover:underline">
                             Sign in
                         </Link>
                     </p>

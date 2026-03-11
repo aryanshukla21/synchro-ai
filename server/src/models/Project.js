@@ -40,6 +40,33 @@ const projectSchema = new mongoose.Schema({
         }, { _id: false }), // _id: false prevents creating an ID for this nested object
         select: false       // Now Mongoose correctly hides this field by default
     },
+
+    // --- NEW: WORKSPACE INTEGRATIONS ---
+    integrations: {
+        geminiApiKey: {
+            type: new mongoose.Schema({
+                iv: { type: String },
+                content: { type: String }
+            }, { _id: false }),
+            select: false // Hidden by default for security
+        },
+        githubToken: {
+            type: new mongoose.Schema({
+                iv: { type: String },
+                content: { type: String }
+            }, { _id: false }),
+            select: false // Hidden by default for security
+        }
+    },
+
+    // --- NEW: WORKSPACE NOTIFICATIONS ---
+    notifications: {
+        slack: { type: String, default: '' },
+        discord: { type: String, default: '' },
+        notifyOnSubmit: { type: Boolean, default: true },
+        notifyOnMerge: { type: Boolean, default: true }
+    },
+
     aiSummary: {
         type: String,
         default: 'Waiting for first task submission to generate summary...'

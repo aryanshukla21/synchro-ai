@@ -348,3 +348,69 @@ exports.updateProject = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.updateIntegrations = async (req, res, next) => {
+    try {
+        const { geminiApiKey, githubToken } = req.body;
+        const project = await Project.findById(req.params.id);
+
+        if (!project) {
+            return next(new ApiError('Project not found', 404));
+        }
+
+        // Initialize object if it's an older document
+        if (!project.integrations) project.integrations = {};
+
+        // Encrypt and save sensitive keys
+        if (geminiApiKey) {
+            project.integrations.geminiApiKey = encrypt(geminiApiKey);
+        }
+        if (githubToken) {
+            project.integrations.githubToken = encrypt(githubToken);
+        }
+
+        await project.save();
+
+        // Log the activity
+        await Activity.create({
+            project: project._id,
+            user: req.user._id,
+            action: 'Updated workspace integration settings'
+        });
+
+        res.status(200).json(new ApiResponse(null, 'Integrations securely saved'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateNotifications = async (req, res, next) => {
+    try {
+        const { slack, discord, notifyOnSubmit, notifyOnMerge } = req.body;
+        const project = await Project.findById(req.params.id);
+
+        if (!project) {
+            return next(new ApiError('Project not found', 404));
+        }
+
+        if (!project.notifications) project.notifications = {};
+
+        // Update fields if provided
+        if (slack !== undefined) project.notifications.slack = slack;
+        if (discord !== undefined) project.notifications.discord = discord;
+        if (notifyOnSubmit !== undefined) project.notifications.notifyOnSubmit = notifyOnSubmit;
+        if (notifyOnMerge !== undefined) project.notifications.notifyOnMerge = notifyOnMerge;
+
+        await project.save();
+
+        await Activity.create({
+            project: project._id,
+            user: req.user._id,
+            action: 'Updated workspace notification preferences'
+        });
+
+        res.status(200).json(new ApiResponse(project.notifications, 'Notification preferences updated'));
+    } catch (error) {
+        next(error);
+    }
+};

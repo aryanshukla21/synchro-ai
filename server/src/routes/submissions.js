@@ -2,7 +2,9 @@ const express = require('express');
 const {
     submitWork,
     mergeWork,
-    getTaskSubmissions
+    getTaskSubmissions,
+    getProjectSubmissions,
+    rejectWork
 } = require('../controllers/submissions.controller.js');
 const { protect } = require('../middleware/authMiddleware.js');
 const { authorizeRoles } = require('../middleware/roleMiddleware.js');
@@ -23,5 +25,11 @@ router.get('/task/:taskId', authorizeRoles('Owner', 'Co-Owner', 'Contributor', '
 
 // Final gate: Only Owners and Co-Owners have the authority to merge and approve work
 router.post('/:id/merge', authorizeRoles('Owner', 'Co-Owner'), mergeWork);
+
+// Fetch all pending submissions for a specific project
+router.get('/project/:projectId', authorizeRoles('Owner', 'Co-Owner'), getProjectSubmissions);
+
+// Reject a submission
+router.post('/:id/reject', authorizeRoles('Owner', 'Co-Owner'), rejectWork);
 
 module.exports = router;

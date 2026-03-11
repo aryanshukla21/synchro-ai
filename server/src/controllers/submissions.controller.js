@@ -148,3 +148,66 @@ exports.getTaskSubmissions = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.getProjectSubmissions = async (req, res, next) => {
+    try {
+        const { projectId } = req.params;
+
+        // Find all tasks belonging to this project
+        const tasks = await Task.find({ project: projectId }).select('_id');
+        const taskIds = tasks.map(t => t._id);
+
+        // Find submissions for these tasks that have not been approved yet
+        const submissions = await Submission.find({
+            task: { $in: taskIds },
+            status: { $ne: 'Approved' } // Adjust if your schema uses a different default status
+        })
+            .populate('task', 'title status deadline')
+            .populate('submittedBy', 'name email avatar')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json(new ApiResponse(submissions, 'Project submissions retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.rejectWork = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        const submission = await Submission.findById(id).populate('task');
+        if (!submission) {
+            return next(new ApiError('Submission not found', 404));
+        }
+
+        const task = submission.task;
+
+        // Update submission and revert task status
+        submission.status = 'Rejected';
+        await submission.save();
+
+        task.status = 'In-Progress'; // Send it back to the assigned user
+        await task.save();
+
+        // Log the rejection
+        await Activity.create({
+            project: task.project,
+            user: req.user._id,
+            action: `Rejected submission for task: "${task.title}"`
+        });
+
+        // Optional: Notify user
+        if (notificationService && typeof notificationService.notifyRejection === 'function') {
+            await notificationService.notifyRejection(
+                submission.submittedBy,
+                req.user._id,
+                task.title
+            );
+        }
+
+        res.status(200).json(new ApiResponse({ submission, task }, 'Work rejected and sent back'));
+    } catch (error) {
+        next(error);
+    }
+};

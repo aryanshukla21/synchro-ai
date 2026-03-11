@@ -1,3 +1,34 @@
+// Load environment variables
+const dotenv = require('dotenv');
+dotenv.config();
+
+const validateEnv = () => {
+    const requiredVars = [
+        'MONGODB_URL',
+        'JWT_SECRET',
+        'CLOUDINARY_CLOUD_NAME',
+        'CLOUDINARY_API_KEY',
+        'CLOUDINARY_API_SECRET',
+        'SMTP_HOST',
+        'SMTP_USER',
+        'SMTP_PASS',
+        'GEMINI_API_KEY'
+    ];
+
+    const missingVars = requiredVars.filter((key) => !process.env[key]);
+
+    if (missingVars.length > 0) {
+        console.error('❌ CRITICAL ERROR: Missing required environment variables:');
+        missingVars.forEach((v) => console.error(`   - ${v}`));
+        console.error('\nServer cannot start without these configurations. Exiting...\n');
+        process.exit(1); // Force shutdown with failure code
+    }
+
+    console.log('✅ Environment validation passed.');
+};
+
+validateEnv();
+
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -21,12 +52,10 @@ const submissionRoutes = require('./routes/submissions');
 const activityRoutes = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
 const commentRoutes = require('./routes/comments');
+const workspaceRoutes = require('./routes/workspace');
 
 // Import Services
 const notificationService = require('./services/notificationServices');
-
-// Load environment variables
-dotenv.config();
 
 // Connect to Database
 connectDB();
@@ -92,6 +121,7 @@ app.use('/api/submissions', submissionRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/workspace', workspaceRoutes);
 
 // 5. Global Error Handling Middleware
 // Replaced the generic inline handler with your robust custom error handler
