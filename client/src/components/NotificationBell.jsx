@@ -1,150 +1,165 @@
 import { useState, useEffect, useRef } from 'react';
-import { Bell, Info } from 'lucide-react';
-import api from '../api/axios';
-import { useAuth } from '../hooks/useAuth';
-import { useSocket } from '../contexts/SocketContext'; // Import socket hook
+import { Bell, CheckCircle2, Circle, Check } from 'lucide-react';
+import api from '../api/axios'; // Adjusted path
+import { useSocket } from '../contexts/SocketContext'; // Adjusted path
 
 const NotificationBell = () => {
-    const { user } = useAuth();
-    const { socket } = useSocket(); // Initialize socket
+    const { socket } = useSocket();
     const [notifications, setNotifications] = useState([]);
-    const [showDropdown, setShowDropdown] = useState(false);
+    const [isOpen, setIsOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
     const dropdownRef = useRef(null);
 
-    // Fetch Initial Notifications
-    const fetchNotifications = async () => {
-        try {
-            const { data } = await api.get('/notifications');
-            // Ensure data.data is an array
-            setNotifications(Array.isArray(data.data) ? data.data : []);
-        } catch (error) {
-            console.error("Failed to load notifications", error);
-            setNotifications([]);
-        }
-    };
-
-    // Initial Fetch on mount or when user changes
+    // 1. Fetch historical notifications on load
     useEffect(() => {
-        if (user) {
-            fetchNotifications();
-        }
-    }, [user]);
+        const fetchNotifications = async () => {
+            try {
+                const { data } = await api.get('/notifications');
+                setNotifications(data.data || []);
 
-    // Real-time socket listener for incoming notifications
+                // Calculate unread count
+                const unread = (data.data || []).filter(n => !n.isRead).length;
+                setUnreadCount(unread);
+            } catch (error) {
+                console.error("Failed to fetch notifications", error);
+            }
+        };
+
+        fetchNotifications();
+    }, []);
+
+    // 2. Real-time Socket Listener for NEW notifications
     useEffect(() => {
         if (!socket) return;
 
-        const handleNewNotification = (newNotification) => {
-            setNotifications((prev) => [newNotification, ...prev]);
+        const handleNewNotification = (newNotif) => {
+            setNotifications(prev => [
+                {
+                    _id: Date.now().toString(), // Temp ID until next refresh if not provided
+                    message: newNotif.message,
+                    type: newNotif.type,
+                    isRead: false,
+                    createdAt: new Date().toISOString()
+                },
+                ...prev
+            ]);
+
+            setUnreadCount(prev => prev + 1);
         };
 
-        // Listen for 'newNotification' event emitted by the backend
-        socket.on('newNotification', handleNewNotification);
+        socket.on('new-notification', handleNewNotification);
 
-        // Cleanup listener on unmount or socket change
         return () => {
-            socket.off('newNotification', handleNewNotification);
+            socket.off('new-notification', handleNewNotification);
         };
     }, [socket]);
 
-    // Handle Click Outside to close dropdown
+    // 3. Close dropdown when clicking outside
     useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-                setShowDropdown(false);
+                setIsOpen(false);
             }
         };
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    const markAsRead = async (id) => {
+    // 4. Mark single notification as read
+    const markAsRead = async (id, e) => {
+        e.stopPropagation();
         try {
-            await api.patch(`/notifications/${id}/read`);
+            // Optimistic UI update
             setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+
+            // Backend API call
+            await api.put(`/notifications/${id}/read`);
         } catch (error) {
-            console.error("Action failed", error);
+            console.error("Failed to mark as read", error);
         }
     };
 
-    const markAllRead = async () => {
+    // 5. Mark all as read
+    const markAllAsRead = async () => {
         try {
-            await api.patch('/notifications/read-all');
             setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+            setUnreadCount(0);
+            await api.put('/notifications/read-all');
         } catch (error) {
-            console.error("Action failed", error);
+            console.error("Failed to mark all as read", error);
         }
     };
-
-    const unreadCount = notifications.filter(n => !n.isRead).length;
 
     return (
         <div className="relative" ref={dropdownRef}>
-            {/* BELL BUTTON */}
+            {/* Bell Icon & Badge */}
             <button
-                onClick={() => setShowDropdown(!showDropdown)}
-                className="relative p-2 text-gray-400 hover:text-white transition rounded-full hover:bg-gray-800 focus:outline-none"
+                onClick={() => setIsOpen(!isOpen)}
+                className="relative p-2 text-gray-400 hover:text-white transition rounded-full hover:bg-gray-800"
             >
                 <Bell size={20} />
                 {unreadCount > 0 && (
-                    <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#1e293b] animate-pulse"></span>
+                    <span className="absolute top-1 right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-[#0f172a]">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
                 )}
             </button>
 
-            {/* DROPDOWN PANEL */}
-            {showDropdown && (
-                <div className="absolute right-0 mt-3 w-80 bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-
-                    {/* Header */}
-                    <div className="p-3 border-b border-gray-700 flex justify-between items-center bg-gray-800/50">
-                        <h3 className="text-sm font-bold text-white">Notifications</h3>
+            {/* Dropdown Panel */}
+            {isOpen && (
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-[#1e293b] rounded-xl shadow-2xl border border-gray-700 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-4 border-b border-gray-700 flex items-center justify-between bg-[#0f172a]/50">
+                        <h3 className="font-bold text-white">Notifications</h3>
                         {unreadCount > 0 && (
-                            <button onClick={markAllRead} className="text-xs text-indigo-400 hover:text-indigo-300 font-medium">
-                                Mark all read
+                            <button
+                                onClick={markAllAsRead}
+                                className="text-xs text-indigo-400 hover:text-indigo-300 font-medium flex items-center gap-1 transition"
+                            >
+                                <Check size={14} /> Mark all read
                             </button>
                         )}
                     </div>
 
-                    {/* List */}
-                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
-                        {notifications.length > 0 ? (
-                            notifications.map(notif => (
-                                <div
-                                    key={notif._id}
-                                    onClick={() => !notif.isRead && markAsRead(notif._id)}
-                                    className={`p-4 border-b border-gray-700/50 last:border-0 hover:bg-gray-800/50 transition cursor-pointer flex gap-3 ${!notif.isRead ? 'bg-indigo-500/5' : ''}`}
-                                >
-                                    {/* Avatar */}
-                                    <div className="mt-1 shrink-0">
-                                        {notif.sender?.avatar ? (
-                                            <img src={notif.sender.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs text-white">
-                                                {notif.sender?.name?.charAt(0) || <Info size={14} />}
-                                            </div>
+                    <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                        {notifications.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">
+                                <Bell className="mx-auto mb-3 opacity-20" size={32} />
+                                <p className="text-sm">You have no notifications.</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-700/50">
+                                {notifications.map((notif) => (
+                                    <div
+                                        key={notif._id}
+                                        className={`p-4 flex gap-3 transition hover:bg-gray-800/50 ${!notif.isRead ? 'bg-indigo-900/10' : ''}`}
+                                    >
+                                        <div className="mt-0.5">
+                                            {!notif.isRead ? (
+                                                <Circle className="text-indigo-500 fill-indigo-500" size={10} />
+                                            ) : (
+                                                <CheckCircle2 className="text-gray-600" size={14} />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm ${!notif.isRead ? 'text-gray-200 font-medium' : 'text-gray-400'}`}>
+                                                {notif.message}
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                {new Date(notif.createdAt).toLocaleDateString()} at {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </p>
+                                        </div>
+                                        {!notif.isRead && (
+                                            <button
+                                                onClick={(e) => markAsRead(notif._id, e)}
+                                                className="opacity-0 group-hover:opacity-100 text-xs text-indigo-400 hover:text-white transition self-center"
+                                                title="Mark as read"
+                                            >
+                                                <Check size={16} />
+                                            </button>
                                         )}
                                     </div>
-
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className={`text-sm leading-tight ${!notif.isRead ? 'text-white font-medium' : 'text-gray-400'}`}>
-                                            {notif.message}
-                                        </p>
-                                        <p className="text-[10px] text-gray-500 mt-1">
-                                            {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </p>
-                                    </div>
-
-                                    {/* Unread Indicator */}
-                                    {!notif.isRead && (
-                                        <div className="w-2 h-2 bg-indigo-500 rounded-full mt-2 shrink-0"></div>
-                                    )}
-                                </div>
-                            ))
-                        ) : (
-                            <div className="p-8 text-center text-gray-500 text-sm flex flex-col items-center gap-2">
-                                <Bell size={24} className="opacity-20" />
-                                <p>No notifications yet.</p>
+                                ))}
                             </div>
                         )}
                     </div>

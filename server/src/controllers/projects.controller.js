@@ -21,8 +21,7 @@ exports.createProject = async (req, res, next) => {
 
         // encrypt api key
         if (aiApiKey) {
-            const encryptedKey = encrypt(aiApiKey);
-            projectData.aiApiKey = encryptedKey;
+            projectData.aiApiKey = encrypt(aiApiKey);
         }
 
         // create project
@@ -57,7 +56,7 @@ exports.getProjects = async (req, res, next) => {
         const query = {
             $or: [
                 { owner: req.user._id },
-                { members: req.user._id }
+                { members: { $elemMatch: { user: req.user._id } } }
             ]
         };
 
@@ -91,12 +90,12 @@ exports.getProjectById = async (req, res, next) => {
         const project = await Project.findById(req.params.id)
             .populate('owner', 'name email avatar')
             .populate('members.user', 'name email avatar')
-            // --- CRITICAL FIX: NESTED POPULATION ---
+            // --- NESTED POPULATION ---
             .populate({
                 path: 'tasks',
                 populate: {
                     path: 'assignedTo',
-                    select: 'name email avatar' // Fetch these specific fields
+                    select: 'name email avatar'
                 }
             })
             .populate({
@@ -150,8 +149,6 @@ exports.inviteMember = async (req, res, next) => {
         });
 
         await project.save();
-
-
 
         // EMAIL SERVICE TRIGGER
         try {
@@ -282,7 +279,6 @@ exports.removeMember = async (req, res, next) => {
         await project.save();
 
         // 4. Log Activity
-        // Fetch user details just for the log name
         const removedUserDoc = await User.findById(memberId);
         await Activity.create({
             project: project._id,
@@ -322,26 +318,27 @@ exports.deleteProject = async (req, res, next) => {
     }
 };
 
+// --- CRITICAL UPDATES: Using $set to protect hidden encrypted fields ---
+
 exports.updateProject = async (req, res, next) => {
     try {
-        const { name, aiApiKey } = req.body;
-        const project = await Project.findById(req.params.id);
+        const { title, description, aiApiKey } = req.body;
+
+        // Prepare strict update object
+        const updateFields = {};
+        if (title) updateFields.title = title;
+        if (description !== undefined) updateFields.description = description;
+        if (aiApiKey) updateFields.aiApiKey = encrypt(aiApiKey);
+
+        const project = await Project.findOneAndUpdate(
+            { _id: req.params.id, owner: req.user._id }, // Inline security check
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        );
 
         if (!project) {
-            return next(new ApiError('Project not found', 404));
+            return next(new ApiError('Project not found or unauthorized', 404));
         }
-
-        if (project.owner.toString() !== req.user.id) {
-            return next(new ApiError('Not authorized to update this project', 401));
-        }
-
-        if (name) project.name = name;
-        if (aiApiKey) {
-            // Re-encrypt the new key
-            project.aiApiKey = encrypt(aiApiKey);
-        }
-
-        await project.save();
 
         res.status(200).json(new ApiResponse(project, 'Project updated successfully'));
     } catch (error) {
@@ -351,27 +348,24 @@ exports.updateProject = async (req, res, next) => {
 
 exports.updateIntegrations = async (req, res, next) => {
     try {
-        const { geminiApiKey, githubToken } = req.body;
-        const project = await Project.findById(req.params.id);
+        const { geminiApiKey, githubToken, githubRepoPath } = req.body;
+
+        // Prepare strict update object
+        const updateFields = {};
+        if (geminiApiKey) updateFields['integrations.geminiApiKey'] = encrypt(geminiApiKey);
+        if (githubToken) updateFields['integrations.githubToken'] = encrypt(githubToken);
+        if (githubRepoPath !== undefined) updateFields['integrations.githubRepoPath'] = githubRepoPath;
+
+        const project = await Project.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        );
 
         if (!project) {
             return next(new ApiError('Project not found', 404));
         }
 
-        // Initialize object if it's an older document
-        if (!project.integrations) project.integrations = {};
-
-        // Encrypt and save sensitive keys
-        if (geminiApiKey) {
-            project.integrations.geminiApiKey = encrypt(geminiApiKey);
-        }
-        if (githubToken) {
-            project.integrations.githubToken = encrypt(githubToken);
-        }
-
-        await project.save();
-
-        // Log the activity
         await Activity.create({
             project: project._id,
             user: req.user._id,
@@ -387,21 +381,23 @@ exports.updateIntegrations = async (req, res, next) => {
 exports.updateNotifications = async (req, res, next) => {
     try {
         const { slack, discord, notifyOnSubmit, notifyOnMerge } = req.body;
-        const project = await Project.findById(req.params.id);
+
+        // Prepare strict update object
+        const updateFields = {};
+        if (slack !== undefined) updateFields['notifications.slack'] = slack;
+        if (discord !== undefined) updateFields['notifications.discord'] = discord;
+        if (notifyOnSubmit !== undefined) updateFields['notifications.notifyOnSubmit'] = notifyOnSubmit;
+        if (notifyOnMerge !== undefined) updateFields['notifications.notifyOnMerge'] = notifyOnMerge;
+
+        const project = await Project.findByIdAndUpdate(
+            req.params.id,
+            { $set: updateFields },
+            { new: true, runValidators: true }
+        );
 
         if (!project) {
             return next(new ApiError('Project not found', 404));
         }
-
-        if (!project.notifications) project.notifications = {};
-
-        // Update fields if provided
-        if (slack !== undefined) project.notifications.slack = slack;
-        if (discord !== undefined) project.notifications.discord = discord;
-        if (notifyOnSubmit !== undefined) project.notifications.notifyOnSubmit = notifyOnSubmit;
-        if (notifyOnMerge !== undefined) project.notifications.notifyOnMerge = notifyOnMerge;
-
-        await project.save();
 
         await Activity.create({
             project: project._id,

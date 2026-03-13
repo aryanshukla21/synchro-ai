@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, ExternalLink, FileText, ArrowLeft, Clock } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { CheckCircle, XCircle, ExternalLink, FileText, ArrowLeft, Clock, Loader2 } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 
@@ -32,22 +32,44 @@ const ProjectReviews = () => {
     const handleAction = async (submissionId, action) => {
         setProcessingId(submissionId);
         try {
-            await api.post(`/submissions/${submissionId}/${action}`);
-            showToast(`Work successfully ${action === 'merge' ? 'approved' : 'rejected'}`, 'success');
-            // Remove the handled submission from the list
+            const { data } = await api.post(`/submissions/${submissionId}/${action}`);
+
+            // Extract the PR URL from the backend response
+            const prUrl = data?.data?.githubPrUrl;
+
+            // Remove the handled submission from the list immediately for snappy UI
             setSubmissions(prev => prev.filter(sub => sub._id !== submissionId));
+
+            // Show dynamic success notifications
+            if (action === 'merge') {
+                showToast('Work successfully approved and merged!', 'success');
+
+                // If a PR was generated, notify the manager
+                if (prUrl) {
+                    showToast(`GitHub PR Created automatically!`, 'info');
+                    // OPTIONAL: Auto-open the PR in a new tab
+                    // window.open(prUrl, '_blank'); 
+                }
+            } else {
+                showToast('Work successfully rejected and sent back', 'success');
+            }
         } catch (error) {
-            showToast(`Failed to ${action} work`, 'error');
+            showToast(error.response?.data?.message || `Failed to ${action} work`, 'error');
         } finally {
             setProcessingId(null);
         }
     };
 
-    if (loading) return <div className="p-10 text-center text-white">Loading pending reviews...</div>;
+    if (loading) return (
+        <div className="p-10 text-center text-white flex flex-col items-center justify-center min-h-[50vh]">
+            <Loader2 className="animate-spin text-indigo-500 mb-4" size={40} />
+            <p className="text-gray-400">Loading pending reviews...</p>
+        </div>
+    );
 
     return (
         <div className="p-6 md:p-10 max-w-7xl mx-auto">
-            <header className="mb-8 flex items-center justify-between">
+            <header className="mb-8 flex items-center justify-between animate-in fade-in duration-300">
                 <div>
                     <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition mb-4">
                         <ArrowLeft size={20} /> Back
@@ -62,13 +84,13 @@ const ProjectReviews = () => {
             </header>
 
             {submissions.length === 0 ? (
-                <div className="bg-[#1e293b] border border-gray-700 rounded-2xl p-10 text-center">
+                <div className="bg-[#1e293b] border border-gray-700 rounded-2xl p-10 text-center animate-in zoom-in-95 duration-300">
                     <CheckCircle className="mx-auto text-emerald-500 mb-4" size={48} />
                     <h2 className="text-xl font-bold text-white">All caught up!</h2>
                     <p className="text-gray-400">There are no pending submissions awaiting your review.</p>
                 </div>
             ) : (
-                <div className="bg-[#1e293b] border border-gray-700 rounded-2xl overflow-hidden">
+                <div className="bg-[#1e293b] border border-gray-700 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-800 border-b border-gray-700 text-gray-400 text-sm uppercase tracking-wider">
@@ -81,7 +103,7 @@ const ProjectReviews = () => {
                         </thead>
                         <tbody className="divide-y divide-gray-700">
                             {submissions.map((sub) => (
-                                <tr key={sub._id} className="hover:bg-[#0f172a]/50 transition">
+                                <tr key={sub._id} className="hover:bg-[#0f172a]/50 transition group">
                                     <td className="p-4">
                                         <p className="font-bold text-white">{sub.task?.title}</p>
                                         <p className="text-xs text-gray-500 mt-1">
@@ -93,7 +115,7 @@ const ProjectReviews = () => {
                                             {sub.submittedBy?.avatar ? (
                                                 <img src={sub.submittedBy.avatar} alt="" className="w-full h-full object-cover" />
                                             ) : (
-                                                sub.submittedBy?.name?.charAt(0)
+                                                sub.submittedBy?.name?.charAt(0) || '?'
                                             )}
                                         </div>
                                         <span className="text-gray-300 text-sm">{sub.submittedBy?.name}</span>
@@ -105,7 +127,7 @@ const ProjectReviews = () => {
                                             rel="noopener noreferrer"
                                             className="flex items-center gap-2 text-indigo-400 hover:text-indigo-300 transition text-sm font-medium"
                                         >
-                                            {sub.contentUrl.includes('cloudinary') ? <FileText size={16} /> : <ExternalLink size={16} />}
+                                            {sub.contentUrl?.includes('cloudinary') ? <FileText size={16} /> : <ExternalLink size={16} />}
                                             View Attached Work
                                         </a>
                                     </td>
@@ -115,17 +137,19 @@ const ProjectReviews = () => {
                                     <td className="p-4 text-right flex items-center justify-end gap-2">
                                         <button
                                             onClick={() => handleAction(sub._id, 'merge')}
-                                            disabled={processingId === sub._id}
-                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition disabled:opacity-50"
+                                            disabled={processingId !== null}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition disabled:opacity-50 min-w-[110px] justify-center"
                                         >
-                                            <CheckCircle size={16} /> Approve
+                                            {processingId === sub._id ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                                            {processingId === sub._id ? 'Merging...' : 'Approve'}
                                         </button>
                                         <button
                                             onClick={() => handleAction(sub._id, 'reject')}
-                                            disabled={processingId === sub._id}
-                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition disabled:opacity-50"
+                                            disabled={processingId !== null}
+                                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition disabled:opacity-50 min-w-[100px] justify-center"
                                         >
-                                            <XCircle size={16} /> Reject
+                                            {processingId === sub._id ? <Loader2 size={16} className="animate-spin" /> : <XCircle size={16} />}
+                                            {processingId === sub._id ? 'Rejecting...' : 'Reject'}
                                         </button>
                                     </td>
                                 </tr>

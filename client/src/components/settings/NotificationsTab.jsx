@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MessageSquare, Save } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
@@ -13,6 +13,27 @@ const NotificationsTab = ({ projectId }) => {
         notifyOnSubmit: true,
         notifyOnMerge: true
     });
+
+    // Fetch existing settings on load to pre-fill the form 
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const { data } = await api.get(`/projects/${projectId}`);
+                if (data?.data?.notifications) {
+                    const { slack, discord, notifyOnSubmit, notifyOnMerge } = data.data.notifications;
+                    setWebhooks({
+                        slack: slack || '',
+                        discord: discord || '',
+                        notifyOnSubmit: notifyOnSubmit !== false, // Defaults to true if undefined
+                        notifyOnMerge: notifyOnMerge !== false
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch notification settings", error);
+            }
+        };
+        fetchNotifications();
+    }, [projectId]);
 
     const handleSaveWebhooks = async () => {
         setIsLoading(true);

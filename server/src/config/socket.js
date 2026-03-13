@@ -57,5 +57,13 @@ module.exports = {
         if (io) {
             io.to(`project_${projectId}`).emit(event, payload);
         }
+    },
+
+    // --- NEW: Helper function to emit events directly to a specific user ---
+    emitToUser: (userId, event, payload) => {
+        if (io) {
+            // Emits directly to the personal room created in the connection block
+            io.to(userId.toString()).emit(event, payload);
+        }
     }
 };

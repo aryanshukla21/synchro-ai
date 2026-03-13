@@ -12,7 +12,8 @@ const validateEnv = () => {
         'SMTP_HOST',
         'SMTP_USER',
         'SMTP_PASS',
-        'GEMINI_API_KEY'
+        'GEMINI_API_KEY',
+        'ENCRYPTION_KEY' // NEW: Ensures encryption utility won't crash
     ];
 
     const missingVars = requiredVars.filter((key) => !process.env[key]);
@@ -31,9 +32,12 @@ validateEnv();
 
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const http = require('http');
 const connectDB = require('./config/db');
+
+// --- IMPORT FILE SYSTEM PACKAGES ---
+const fs = require('fs');
+const path = require('path');
 
 // --- IMPORT SECURITY PACKAGES ---
 const helmet = require('helmet');
@@ -62,6 +66,13 @@ connectDB();
 
 const app = express();
 const server = http.createServer(app);
+
+// --- Ensure temp directory exists for Multer ---
+// This prevents "ENOENT: no such file or directory" crashes on deployment
+const tempDir = path.join(__dirname, '../public/temp');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+}
 
 // --- CONFIGURATION ---
 const CLIENT_URL = process.env.CLIENT_URL || "http://localhost:5173";
@@ -93,7 +104,7 @@ app.use(cors({
 }));
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '10mb' })); // Limit body payload size to 10kb to prevent payload overflow attacks
+app.use(express.json({ limit: '10mb' })); // Limit body payload size to 10mb to prevent payload overflow attacks
 
 // Data sanitization against NoSQL query injection
 // This removes any keys containing prohibited characters like $ or .

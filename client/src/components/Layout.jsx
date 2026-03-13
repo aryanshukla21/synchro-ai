@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
+import GlobalSocketListener from './GlobalSocketListener';
 
 const Layout = () => {
     // State is lifted here to persist across pages
@@ -8,6 +9,9 @@ const Layout = () => {
 
     return (
         <div className="min-h-screen bg-[#0f172a] text-gray-300 font-sans flex">
+            {/* Invisible listener to catch real-time socket events across the entire app */}
+            <GlobalSocketListener />
+
             {/* The Global Sidebar */}
             <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
 

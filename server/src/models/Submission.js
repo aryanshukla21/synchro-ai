@@ -12,7 +12,7 @@ const submissionSchema = new mongoose.Schema({
         required: true
     },
     contentUrl: {
-        type: String               // Link to file/code/document
+        type: String               // Link to file/code/document (e.g., Cloudinary URL)
     },
     comment: {
         type: String               // Contributor's note to owner
@@ -21,6 +21,11 @@ const submissionSchema = new mongoose.Schema({
         feedback: String,          // Detailed AI comments
         score: Number,             // Suggested quality score
         passedAI: Boolean          // Automated pass/fail based on project rules
+    },
+    // --- NEW: Added to store the automated GitHub Pull Request link ---
+    githubPrUrl: {
+        type: String,
+        default: null
     },
     status: {
         type: String,

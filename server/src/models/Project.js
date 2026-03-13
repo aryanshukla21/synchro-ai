@@ -41,7 +41,7 @@ const projectSchema = new mongoose.Schema({
         select: false       // Now Mongoose correctly hides this field by default
     },
 
-    // --- NEW: WORKSPACE INTEGRATIONS ---
+    // WORKSPACE INTEGRATIONS ---
     integrations: {
         geminiApiKey: {
             type: new mongoose.Schema({
@@ -56,6 +56,11 @@ const projectSchema = new mongoose.Schema({
                 content: { type: String }
             }, { _id: false }),
             select: false // Hidden by default for security
+        },
+        //Target Repository Path for PR Automation ---
+        githubRepoPath: {
+            type: String,
+            default: ''
         }
     },
 
