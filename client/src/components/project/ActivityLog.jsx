@@ -1,12 +1,20 @@
-import { Activity } from 'lucide-react';
+import { Activity, ExternalLink } from 'lucide-react';
+import { Link, useParams } from 'react-router-dom';
 
 const ActivityLog = ({ activities }) => {
+    const { id } = useParams(); // Get projectId from the route params
+
     return (
         <div className="bg-[#1e293b] rounded-2xl border border-gray-700 overflow-hidden flex flex-col h-[400px]">
             <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-[#1e293b]">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                     <Activity size={18} className="text-indigo-400" /> Recent Activity
                 </h3>
+                {id && (
+                    <Link to={`/project/${id}/audit-log`} className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 transition">
+                        View Full Log <ExternalLink size={14} />
+                    </Link>
+                )}
             </div>
             <div className="p-5 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
                 {activities.slice(0, 10).map((act) => (

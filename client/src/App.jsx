@@ -17,11 +17,12 @@ import SetupPassword from './pages/SetupPassword';
 import ProjectReviews from './pages/ProjectReviews';
 import Settings from './pages/Settings';
 import JoinWorkspace from './pages/JoinWorkspace';
+import ProjectAuditLog from './pages/ProjectAuditLog';
 
 // Components & Contexts
 import Layout from './components/Layout';
 import { ToastProvider } from './contexts/ToastContext';
-import { SocketProvider } from './contexts/SocketContext'; // <-- NEW: Import Socket Provider
+import { SocketProvider } from './contexts/SocketContext';
 import GlobalNotificationListener from './components/GlobalNotificationListener';
 
 const PrivateRoute = ({ children }) => {
@@ -76,6 +77,7 @@ function App() {
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/project/:id" element={<ProjectDetails />} />
               <Route path="/project/:projectId/reviews" element={<ProjectReviews />} />
+              <Route path="/project/:projectId/audit-log" element={<ProjectAuditLog />} />
               <Route path="/profile" element={<MyProfile />} />
               <Route path="/task/:id/work" element={<TaskWorkPage />} />
               <Route path="/project/:projectId/settings" element={<Settings />} />

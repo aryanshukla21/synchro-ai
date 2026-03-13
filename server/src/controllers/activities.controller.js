@@ -5,15 +5,53 @@ const { ApiResponse, ApiError } = require('../utils/apiResponse');
 exports.getProjectActivities = async (req, res, next) => {
     try {
         const { projectId } = req.params;
+        const { page = 1, limit = 20, search = '', userId, startDate, endDate } = req.query;
 
-        const activities = await Activity.find({ project: projectId })
+        const query = { project: projectId };
+
+        // Apply filters if provided
+        if (userId) {
+            query.user = userId;
+        }
+
+        if (search) {
+            query.action = { $regex: search, $options: 'i' };
+        }
+
+        if (startDate || endDate) {
+            query.createdAt = {};
+            if (startDate) {
+                query.createdAt.$gte = new Date(startDate);
+            }
+            if (endDate) {
+                // Set the end date to the end of the day
+                const end = new Date(endDate);
+                end.setHours(23, 59, 59, 999);
+                query.createdAt.$lte = end;
+            }
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        // Fetch counts for pagination math
+        const total = await Activity.countDocuments(query);
+
+        const activities = await Activity.find(query)
             .populate('user', 'name email avatar')
-            .sort({ createdAt: -1 });
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parseInt(limit));
 
-        // FIX: Use 200 for GET requests (201 is for creation)
         res.status(200).json(new ApiResponse(
             activities,
-            'Project activity logs retrieved successfully'
+            'Project activity logs retrieved successfully',
+            200,
+            {
+                total,
+                page: parseInt(page),
+                limit: parseInt(limit),
+                totalPages: Math.ceil(total / parseInt(limit))
+            }
         ));
     }
     catch (error) {
@@ -23,12 +61,10 @@ exports.getProjectActivities = async (req, res, next) => {
 
 exports.getUserActivities = async (req, res, next) => {
     try {
-        // FIX: Use req.user._id to ensure compatibility with Mongoose document
         const activities = await Activity.find({ user: req.user._id })
             .populate('project', 'title')
             .sort({ createdAt: -1 });
 
-        // FIX: Use 200 for GET requests
         res.status(200).json(new ApiResponse(
             activities,
             'Personal activity logs retrieved successfully'
