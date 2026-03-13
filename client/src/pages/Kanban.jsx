@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useOutletContext, useParams } from 'react-router-dom';
+import { useOutletContext, useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
 import TaskCard from '../components/kanban/TaskCard';
 import TaskDetailPanel from '../components/kanban/TaskDetailPanel';
-import { Search, Menu, AlertTriangle, CheckCircle2, XCircle, ChevronDown, Loader2 } from 'lucide-react';
+import {
+    Search, Menu, AlertTriangle, CheckCircle2, XCircle,
+    ChevronDown, Loader2, Calendar as CalendarIcon, Kanban as KanbanIcon
+} from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
-import { useToast } from '../contexts/ToastContext'; // Make sure this path is correct
+import { useToast } from '../contexts/ToastContext';
 
 const Kanban = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
@@ -16,7 +19,7 @@ const Kanban = () => {
     const [tasks, setTasks] = useState([]);
     const [selectedTask, setSelectedTask] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState(''); // NEW: Search state
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Pagination State
     const [page, setPage] = useState(1);
@@ -89,7 +92,7 @@ const Kanban = () => {
             );
         };
 
-        // CRITICAL FIX: Match backend kebab-case event names
+        // Match backend kebab-case event names
         socket.on('task-updated', handleTaskUpdated);
         socket.on('task-created', handleTaskCreated);
         socket.on('task-deleted', handleTaskDeleted);
@@ -116,7 +119,6 @@ const Kanban = () => {
         try {
             await api.post(`/task/${taskId}/respond`, { response });
             showToast(`Task ${response}ed successfully`, 'success');
-            // Note: UI updates automatically via Socket 'task-updated' event!
         } catch (err) {
             showToast(err.response?.data?.message || "Action failed", 'error');
         }
@@ -179,13 +181,29 @@ const Kanban = () => {
                     <h1 className="text-xl font-bold text-white">Kanban Board</h1>
                 </div>
 
-                <div className="flex gap-3 items-center">
+                <div className="flex gap-4 items-center">
+
+                    {/* --- THE VIEW SWITCHER --- */}
+                    {projectId && (
+                        <div className="hidden md:flex bg-[#1e293b] p-1 rounded-lg border border-gray-700 items-center">
+                            <div className="px-4 py-1.5 text-sm font-bold bg-indigo-600 text-white rounded-md shadow flex items-center gap-2 pointer-events-none">
+                                <KanbanIcon size={16} /> Board
+                            </div>
+                            <Link
+                                to={`/project/${projectId}/calendar`}
+                                className="px-4 py-1.5 text-sm font-bold text-gray-400 hover:text-white rounded-md transition flex items-center gap-2"
+                            >
+                                <CalendarIcon size={16} /> Calendar
+                            </Link>
+                        </div>
+                    )}
+
                     {/* LOAD MORE BUTTON */}
                     {paginationMeta && paginationMeta.page < paginationMeta.totalPages && (
                         <button
                             onClick={handleLoadMore}
                             disabled={loadingMore}
-                            className="bg-[#1e293b] hover:bg-gray-800 border border-gray-700 text-xs text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition disabled:opacity-50 mr-2"
+                            className="bg-[#1e293b] hover:bg-gray-800 border border-gray-700 text-xs text-white px-4 py-2 rounded-lg font-bold flex items-center gap-2 transition disabled:opacity-50"
                         >
                             {loadingMore ? <Loader2 size={14} className="animate-spin" /> : <ChevronDown size={14} />}
                             {loadingMore ? 'Loading...' : 'Load Older Tasks'}
