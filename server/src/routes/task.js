@@ -1,54 +1,82 @@
 const express = require('express');
+const { upload } = require('../middleware/multerMiddleware');
+const { protect } = require('../middleware/authMiddleware');
+const { authorizeRoles } = require('../middleware/roleMiddleware');
+
 const {
     createTask,
-    updateTask,               // Added for editing task details
+    updateTask,
     getProjectTasks,
     updateTaskStatus,
-    reviewTaskSubmission,     // Added for Admin Merge/Decline logic
+    reviewTaskSubmission,
     getMyTasks,
     requestLeave,
     handleLeaveRequest,
     respondToTaskAssignment,
-    getTaskById
-} = require('../controllers/task.controller.js');
-const { protect } = require('../middleware/authMiddleware.js');
-
-// IMPORT THE NEW RBAC MIDDLEWARE
-const { authorizeRoles } = require('../middleware/roleMiddleware.js');
+    getTaskById,
+    uploadTaskAttachment // <-- NEW: Imported attachment controller
+} = require('../controllers/task.controller');
 
 const router = express.Router();
 
-// All task routes require authentication
+// Apply authentication middleware to ALL routes in this file
 router.use(protect);
 
-// --- General Task Routes ---
-// Viewers are excluded from creating tasks
-router.post('/', authorizeRoles('Owner', 'Co-Owner', 'Contributor'), createTask);
-router.get('/user/me', getMyTasks);     // Get tasks assigned to logged-in user (No project context needed)
+// ==========================================
+// CORE TASK ROUTES
+// ==========================================
 
-// --- Project Specific Routes ---
-// Enforce that only recognized, active members can view the project tasks
+// Create a new task (Viewers cannot create tasks)
+router.post('/', authorizeRoles('Owner', 'Co-Owner', 'Contributor'), createTask);
+
+// Get all tasks assigned to the logged-in user globally
+router.get('/user/me', getMyTasks);
+
+// Get all tasks for a specific project
 router.get('/project/:projectId', authorizeRoles('Owner', 'Co-Owner', 'Contributor', 'Viewer'), getProjectTasks);
 
-// --- Single Task Operations ---
-// Anyone in the project can view a task's full details
+
+// ==========================================
+// SINGLE TASK OPERATIONS
+// ==========================================
+
+// Get full details of a specific task
 router.get('/:id', authorizeRoles('Owner', 'Co-Owner', 'Contributor', 'Viewer'), getTaskById);
-// Viewers cannot update task details
+
+// Update general task details (Title, Description, Priority, etc.)
 router.put('/:id', authorizeRoles('Owner', 'Co-Owner', 'Contributor'), updateTask);
 
-// --- Workflow & Status Routes ---
-// Viewers cannot move cards on the Kanban board
+
+// ==========================================
+// WORKFLOW & STATUS ROUTES
+// ==========================================
+
+// Move task across Kanban columns
 router.patch('/:id/status', authorizeRoles('Owner', 'Co-Owner', 'Contributor'), updateTaskStatus);
-// Admin Review: Only Owners and Co-Owners can Merge or Decline work
+
+// Admin Review: Merge or Decline submitted work
 router.patch('/:id/review', authorizeRoles('Owner', 'Co-Owner'), reviewTaskSubmission);
 
-// --- Assignment & Leave Routes ---
-// A user accepting/declining an assignment might be "Pending", so we don't apply strict roles here
+
+// ==========================================
+// ASSIGNMENTS & LEAVE REQUESTS
+// ==========================================
+
+// Accept or Decline a task assignment (No strict roles as user might be 'Pending')
 router.post('/:id/respond', respondToTaskAssignment);
 
-// Any active member assigned to a task can request to leave it
+// Request to be unassigned from a task
 router.patch('/:id/leave', authorizeRoles('Owner', 'Co-Owner', 'Contributor', 'Viewer'), requestLeave);
-// Only administrators can approve or reject a leave request
+
+// Approve or Reject a leave request
 router.patch('/:id/handle-leave', authorizeRoles('Owner', 'Co-Owner'), handleLeaveRequest);
+
+
+// ==========================================
+// FILES & ATTACHMENTS
+// ==========================================
+
+// Upload a file attachment to a task (Intercepted by Multer for Cloudinary processing)
+router.post('/:id/attachments', upload.single('file'), authorizeRoles('Owner', 'Co-Owner', 'Contributor'), uploadTaskAttachment);
 
 module.exports = router;

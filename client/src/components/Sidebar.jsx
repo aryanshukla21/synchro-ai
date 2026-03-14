@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutGrid, Folder, CheckSquare, X, LogOut } from 'lucide-react';
+import { LayoutGrid, Folder, CheckSquare, X, LogOut, BarChart, Target, Users, Clock } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -32,12 +32,19 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
 
             {/* Navigation Links */}
-            <nav className="flex-1 px-4 space-y-2 mt-6">
+            <nav className="flex-1 px-4 space-y-2 mt-6 overflow-y-auto max-h-[calc(100vh-200px)] scrollbar-thin scrollbar-thumb-gray-700">
                 <NavItem
-                    to="/"
+                    to="/dashboard"
                     icon={<LayoutGrid size={20} />}
                     label="Dashboard"
-                    active={isActive('/')}
+                    active={isActive('/dashboard') || isActive('/')}
+                />
+
+                <NavItem
+                    to="/my-work"
+                    icon={<Target size={20} />}
+                    label="My Work"
+                    active={isActive('/my-work')}
                 />
 
                 <NavItem
@@ -48,15 +55,36 @@ const Sidebar = ({ isOpen, onClose }) => {
                 />
 
                 <NavItem
+                    to="/workload"
+                    icon={<Users size={20} />}
+                    label="Resource Allocation"
+                    active={isActive('/workload')}
+                />
+
+                <NavItem
+                    to="/analytics"
+                    icon={<BarChart size={20} />}
+                    label="Reports & Analytics"
+                    active={isActive('/analytics')}
+                />
+
+                <NavItem
                     to="/kanban"
                     icon={<CheckSquare size={20} />}
                     label="Kanban Board"
                     active={isActive('/kanban')}
                 />
+
+                <NavItem
+                    to="/timesheet"
+                    icon={<Clock size={20} />}
+                    label="Timesheets"
+                    active={isActive('/timesheet')}
+                />
             </nav>
 
             {/* User Profile Footer */}
-            <div className="p-4 border-t border-gray-700 absolute bottom-0 w-full">
+            <div className="p-4 border-t border-gray-700 absolute bottom-0 w-full bg-[#1e293b]">
                 <div className="bg-gray-800 p-3 rounded-lg flex items-center justify-between group hover:bg-gray-750 transition">
                     {/* Wrap user info in Link */}
                     <Link to="/profile" className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => window.innerWidth < 768 && onClose()}>
@@ -73,7 +101,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                         </div>
                     </Link>
 
-                    {/* Logout Button (Stop Propagation to prevent navigation when logging out) */}
+                    {/* Logout Button */}
                     <button
                         onClick={(e) => {
                             e.preventDefault();

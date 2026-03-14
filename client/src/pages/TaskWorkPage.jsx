@@ -1,229 +1,353 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-    Clock, ArrowLeft, Github, Upload,
-    CheckCircle, FileText, Play
-} from 'lucide-react';
 import api from '../api/axios';
+import { useAuth } from '../hooks/useAuth';
+import { useSocket } from '../contexts/SocketContext';
 import { useToast } from '../contexts/ToastContext';
+import {
+    ArrowLeft, Save, Clock, History, AlertTriangle,
+    FileText, User, Loader2, Paperclip, UploadCloud, Download
+} from 'lucide-react';
 
 const TaskWorkPage = () => {
-    const { id } = useParams();
+    const { id: taskId } = useParams();
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const { socket } = useSocket();
     const { showToast } = useToast();
 
     const [task, setTask] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [timeLeft, setTimeLeft] = useState('');
-    const [isOverdue, setIsOverdue] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [activeTab, setActiveTab] = useState('details');
 
-    // Submission State
-    const [githubUrl, setGithubUrl] = useState('');
-    const [file, setFile] = useState(null);
-    const [comment, setComment] = useState(''); // Added comment state
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    // Presence Indicators State
+    const [activeEditors, setActiveEditors] = useState([]);
+    const typingTimeoutRef = useRef(null);
 
-    // Fetch Task
+    // Form & Upload State
+    const [formData, setFormData] = useState({});
+    const [isUploading, setIsUploading] = useState(false);
+
     useEffect(() => {
-        const fetchTask = async () => {
-            try {
-                const { data } = await api.get(`/task/${id}`);
-                setTask(data.data || data);
-            } catch (error) {
-                console.error(error);
-                showToast('Failed to load task details', 'error');
-            } finally {
-                setLoading(false);
+        fetchTask();
+    }, [taskId]);
+
+    const fetchTask = async () => {
+        try {
+            const { data } = await api.get(`/task/${taskId}`);
+            setTask(data.data);
+            setFormData({
+                title: data.data.title,
+                description: data.data.description,
+                status: data.data.status,
+                priority: data.data.priority,
+            });
+        } catch (error) {
+            showToast("Failed to load task", "error");
+            navigate(-1);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- SOCKET LOGIC FOR PRESENCE INDICATORS ---
+    useEffect(() => {
+        if (!socket || !task) return;
+
+        // Join the project room to hear typing events
+        socket.emit('joinProject', task.project._id || task.project);
+
+        const handleUserTyping = ({ taskId: editingTaskId, user: editingUser }) => {
+            if (editingTaskId === taskId && editingUser._id !== user._id) {
+                setActiveEditors(prev => {
+                    if (!prev.find(u => u._id === editingUser._id)) {
+                        return [...prev, editingUser];
+                    }
+                    return prev;
+                });
             }
         };
-        fetchTask();
-    }, [id]);
 
-    // Reverse Countdown Logic
+        const handleUserStopped = ({ taskId: editingTaskId, user: editingUser }) => {
+            if (editingTaskId === taskId) {
+                setActiveEditors(prev => prev.filter(u => u._id !== editingUser._id));
+            }
+        };
+
+        const handleTaskUpdated = (updatedTask) => {
+            if (updatedTask._id === taskId) {
+                setTask(updatedTask);
+                // Update local form state if we aren't currently focusing the inputs
+                // (In a production app, you might want to merge changes or warn the user)
+                showToast("Task was just updated by someone else", "info");
+            }
+        };
+
+        socket.on('task-being-edited', handleUserTyping);
+        socket.on('task-stopped-editing', handleUserStopped);
+        socket.on('taskUpdated', handleTaskUpdated);
+
+        return () => {
+            socket.emit('leaveProject', task.project._id || task.project);
+            socket.off('task-being-edited', handleUserTyping);
+            socket.off('task-stopped-editing', handleUserStopped);
+            socket.off('taskUpdated', handleTaskUpdated);
+        };
+    }, [socket, task, taskId, user._id]);
+
+    // Handle Input Focus/Blur to emit typing states
+    const handleFocus = () => {
+        if (socket && task) {
+            socket.emit('task-typing-start', { projectId: task.project._id || task.project, taskId, user });
+        }
+    };
+
+    const handleBlur = () => {
+        if (socket && task) {
+            socket.emit('task-typing-stop', { projectId: task.project._id || task.project, taskId, user });
+        }
+    };
+
+    // Auto-stop typing if the user unmounts or navigates away
     useEffect(() => {
-        if (!task?.deadline) return;
+        return () => handleBlur();
+    }, []);
 
-        const interval = setInterval(() => {
-            const now = new Date().getTime();
-            const deadline = new Date(task.deadline).getTime();
-            const distance = deadline - now;
-
-            if (distance < 0) {
-                setIsOverdue(true);
-                setTimeLeft('OVERDUE');
-            } else {
-                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-                setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`);
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [task]);
-
-    const handleUpdateTask = async (updates) => {
-        try {
-            const { data } = await api.put(`/task/${id}`, updates);
-            setTask(data.data);
-            showToast('Task updated!', 'success');
-        } catch (error) {
-            showToast('Update failed', 'error');
-        }
-    };
-
-    const handleRequestExtension = async () => {
-        if (confirm("Send a request to the project owner for more time?")) {
-            try {
-                showToast('Extension request sent to owner.', 'success');
-            } catch (error) {
-                showToast('Failed to send request.', 'error');
-            }
-        }
-    };
-
-    const handleSubmitWork = async (e) => {
+    const handleSave = async (e) => {
         e.preventDefault();
-
-        // Validation Check
-        if (!githubUrl.trim() && !file) {
-            showToast('You must provide a GitHub Link OR upload a file to submit.', 'error');
-            return;
-        }
-
-        setIsSubmitting(true);
+        setIsSaving(true);
         try {
-            // Create FormData object to handle multipart/form-data (files + text)
-            const formData = new FormData();
+            const { data } = await api.put(`/task/${taskId}`, formData);
+            setTask(data.data);
+            showToast("Task saved successfully", "success");
+            handleBlur(); // Release the lock
+        } catch (error) {
+            showToast(error.response?.data?.message || "Failed to save", "error");
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
-            // Append required fields based on your backend controller
-            formData.append('taskId', id);
+    // --- FILE UPLOAD HANDLER ---
+    const handleFileUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
 
-            if (githubUrl.trim()) {
-                formData.append('contentUrl', githubUrl.trim());
-            }
+        const uploadData = new FormData();
+        uploadData.append('file', file);
 
-            if (file) {
-                // The name 'file' must match what your multer middleware expects e.g., upload.single('file')
-                formData.append('file', file);
-            }
-
-            if (comment.trim()) {
-                formData.append('comment', comment.trim());
-            }
-
-            // POST to the actual submissions route
-            await api.post('/submissions/submit', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data'
-                }
+        setIsUploading(true);
+        try {
+            const { data } = await api.post(`/task/${taskId}/attachments`, uploadData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
 
-            showToast('Work submitted successfully for review!', 'success');
-            navigate(-1);
-        } catch (error) {
-            console.error(error);
-            const errorMessage = error.response?.data?.message || 'Submission failed';
-            showToast(errorMessage, 'error');
+            setTask(data.data); // Update UI with new file
+            showToast('File uploaded successfully', 'success');
+        } catch (err) {
+            showToast('Failed to upload file', 'error');
         } finally {
-            setIsSubmitting(false);
+            setIsUploading(false);
+            e.target.value = ''; // Reset input
         }
     };
 
-    if (loading) return <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center">Loading...</div>;
-    if (!task) return <div className="min-h-screen bg-[#0f172a] text-white flex items-center justify-center">Task not found</div>;
+    if (loading) return <div className="flex-1 flex justify-center items-center h-full bg-[#0f172a]"><Loader2 className="animate-spin text-indigo-500" size={40} /></div>;
 
     return (
-        <div className="min-h-screen bg-[#0f172a] text-gray-300 font-sans p-6 md:p-10">
-            {/* Header */}
-            <header className="max-w-5xl mx-auto mb-10 flex items-center justify-between">
-                <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-400 hover:text-white transition">
-                    <ArrowLeft size={20} /> Back to Board
-                </button>
-                <div className={`px-4 py-2 rounded-lg font-mono font-bold text-xl flex items-center gap-3 ${isOverdue ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'}`}>
-                    <Clock size={20} />
-                    {timeLeft || "No Deadline"}
+        <div className="flex flex-col h-full bg-[#0f172a] text-gray-300">
+            <header className="px-6 py-4 border-b border-gray-800 bg-[#0f172a] flex items-center justify-between sticky top-0 z-10">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white transition"><ArrowLeft size={20} /></button>
+                    <div>
+                        <h1 className="text-lg font-bold text-white flex items-center gap-2">Task Workspace</h1>
+                        <p className="text-xs text-gray-500">{task?.title}</p>
+                    </div>
+                </div>
+                <div className="flex bg-[#1e293b] p-1 rounded-lg border border-gray-700">
+                    <button onClick={() => setActiveTab('details')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition ${activeTab === 'details' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>Details</button>
+                    <button onClick={() => setActiveTab('history')} className={`px-4 py-1.5 text-xs font-bold rounded-md transition flex items-center gap-1 ${activeTab === 'history' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}>
+                        <History size={14} /> Changelog
+                    </button>
                 </div>
             </header>
 
-            <main className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Left: Task Details */}
-                <div className="lg:col-span-2 space-y-8">
-                    <div>
-                        <h1 className="text-4xl font-bold text-white mb-4">{task.title}</h1>
-                        <div className="flex gap-4 mb-6">
-                            <span className="bg-[#1e293b] px-3 py-1 rounded-full text-sm border border-gray-700 text-gray-300">
-                                {task.project?.title || "Project Task"}
-                            </span>
-                            <span className={`px-3 py-1 rounded-full text-sm border ${task.priority === 'High' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                                }`}>
-                                {task.priority} Priority
-                            </span>
-                        </div>
-                        <div className="bg-[#1e293b] p-6 rounded-2xl border border-gray-700">
-                            <h3 className="text-gray-400 font-bold uppercase text-xs tracking-wider mb-4">Description</h3>
-                            <p className="text-gray-300 leading-relaxed whitespace-pre-wrap">
-                                {task.description || "No description provided."}
-                            </p>
-                        </div>
-                    </div>
+            {/* PRESENCE WARNING BANNER */}
+            {activeEditors.length > 0 && (
+                <div className="bg-amber-500/10 border-b border-amber-500/20 p-3 px-6 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                    <AlertTriangle className="text-amber-500 shrink-0" size={18} />
+                    <p className="text-sm text-amber-400">
+                        <span className="font-bold">{activeEditors.map(u => u.name).join(', ')}</span> {activeEditors.length === 1 ? 'is' : 'are'} currently editing this task. Wait for them to finish to avoid overwriting data.
+                    </p>
+                </div>
+            )}
 
-                    {/* Quick Actions */}
-                    <div className="flex gap-4">
-                        {['To-Do', 'To-todo'].includes(task.status) && (
+            <main className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-700 max-w-5xl mx-auto w-full">
+                {activeTab === 'details' && (
+                    <form onSubmit={handleSave} className="space-y-6">
+                        <div className="bg-[#1e293b] border border-gray-700 p-6 rounded-xl shadow-lg">
+                            <div className="mb-4">
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Task Title</label>
+                                <input
+                                    type="text"
+                                    value={formData.title}
+                                    onFocus={handleFocus}
+                                    onBlur={handleBlur}
+                                    onChange={e => setFormData({ ...formData, title: e.target.value })}
+                                    className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-2.5 px-4 text-white font-medium focus:outline-none focus:border-indigo-500 transition"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Status</label>
+                                    <select
+                                        value={formData.status}
+                                        onFocus={handleFocus}
+                                        onBlur={handleBlur}
+                                        onChange={e => setFormData({ ...formData, status: e.target.value })}
+                                        className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:border-indigo-500 transition"
+                                    >
+                                        <option value="To-Do">To-Do</option>
+                                        <option value="In-Progress">In-Progress</option>
+                                        <option value="Review-Requested">Review-Requested</option>
+                                        <option value="Merged">Merged</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Priority</label>
+                                    <select
+                                        value={formData.priority}
+                                        onFocus={handleFocus}
+                                        onBlur={handleBlur}
+                                        onChange={e => setFormData({ ...formData, priority: e.target.value })}
+                                        className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-2.5 px-4 text-white focus:outline-none focus:border-indigo-500 transition"
+                                    >
+                                        <option value="Low">Low</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="High">High</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1 block">Description</label>
+                                <textarea
+                                    value={formData.description || ''}
+                                    onFocus={handleFocus}
+                                    onBlur={handleBlur}
+                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                    className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-3 px-4 text-white h-40 focus:outline-none focus:border-indigo-500 resize-none transition"
+                                />
+                            </div>
+
+                            {/* --- ATTACHMENTS SECTION --- */}
+                            <div className="mt-8 border-t border-gray-700 pt-8">
+                                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                    <Paperclip size={16} /> Attachments & Files
+                                </h3>
+
+                                {/* Drag & Drop Zone */}
+                                <div className="border-2 border-dashed border-gray-600 rounded-xl p-8 text-center hover:border-indigo-500 hover:bg-indigo-500/5 transition relative overflow-hidden group">
+                                    <input
+                                        type="file"
+                                        onChange={handleFileUpload}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                        disabled={isUploading}
+                                    />
+                                    <UploadCloud size={32} className="mx-auto text-gray-500 mb-3 group-hover:text-indigo-400 transition" />
+                                    <p className="text-sm text-gray-300 font-medium">Click or drag a file to this area to upload</p>
+                                    <p className="text-xs text-gray-500 mt-1">Supports Images, PDFs, and ZIP files.</p>
+
+                                    {isUploading && (
+                                        <div className="absolute inset-0 bg-[#1e293b]/80 backdrop-blur-sm flex flex-col items-center justify-center z-20">
+                                            <Loader2 className="animate-spin text-indigo-500 mb-2" size={28} />
+                                            <p className="text-xs font-bold text-indigo-400">Uploading to Cloudinary...</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Render Uploaded Files */}
+                                {task?.attachments?.length > 0 && (
+                                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        {task.attachments.map((file, index) => (
+                                            <div key={index} className="flex items-center justify-between bg-[#0f172a] p-3 rounded-lg border border-gray-700 hover:border-indigo-500/50 transition">
+                                                <div className="flex items-center gap-3 overflow-hidden">
+                                                    <div className="w-10 h-10 rounded bg-indigo-500/10 flex items-center justify-center text-indigo-400 shrink-0">
+                                                        {file.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                                                            <img src={file.url} alt="preview" className="w-full h-full object-cover rounded opacity-80" />
+                                                        ) : (
+                                                            <FileText size={20} />
+                                                        )}
+                                                    </div>
+                                                    <div className="truncate">
+                                                        <p className="text-sm font-medium text-white truncate">{file.name}</p>
+                                                        <p className="text-[10px] text-gray-500">{new Date(file.uploadedAt).toLocaleDateString()}</p>
+                                                    </div>
+                                                </div>
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/10 rounded transition shrink-0" title="Download">
+                                                    <Download size={16} />
+                                                </a>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
                             <button
-                                onClick={() => handleUpdateTask({ status: 'In-Progress' })}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold transition flex items-center gap-2"
+                                type="submit"
+                                disabled={isSaving || activeEditors.length > 0}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-900/20 transition disabled:opacity-50"
                             >
-                                <Play size={20} /> Mark In-Progress
+                                {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                {activeEditors.length > 0 ? 'Locked by Editor' : 'Save Changes'}
                             </button>
-                        )}
-                        <button
-                            onClick={handleRequestExtension}
-                            className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-bold transition"
-                        >
-                            Request Extension
-                        </button>
+                        </div>
+                    </form>
+                )}
+
+                {/* CHANGELOG VIEW */}
+                {activeTab === 'history' && (
+                    <div className="bg-[#1e293b] border border-gray-700 rounded-xl overflow-hidden shadow-lg p-6">
+                        <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                            <History className="text-indigo-400" size={20} /> Version History
+                        </h2>
+
+                        <div className="space-y-6 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gray-700">
+                            {task?.changelog?.length === 0 ? (
+                                <p className="text-gray-500 text-center py-10">No changes recorded yet.</p>
+                            ) : (
+                                [...(task?.changelog || [])].reverse().map((log, idx) => (
+                                    <div key={idx} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                                        <div className="flex items-center justify-center w-10 h-10 rounded-full border border-gray-700 bg-[#0f172a] text-indigo-400 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 overflow-hidden z-10">
+                                            {log.user?.avatar ? <img src={log.user.avatar} className="w-full h-full object-cover" /> : log.user?.name?.charAt(0)}
+                                        </div>
+                                        <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-[#0f172a] p-4 rounded-xl border border-gray-700 shadow">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="font-bold text-gray-200 text-sm">{log.user?.name}</span>
+                                                <span className="text-xs text-gray-500">{new Date(log.changedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                            <p className="text-sm text-gray-400">
+                                                Changed <span className="font-bold text-white">{log.field}</span>
+                                            </p>
+                                            <div className="mt-2 text-xs bg-gray-800/50 rounded p-2 border border-gray-700/50 flex flex-col gap-1">
+                                                <div className="flex gap-2">
+                                                    <span className="text-rose-400 font-medium line-through decoration-rose-500/50">Old: {String(log.oldValue).substring(0, 50)}{String(log.oldValue).length > 50 && '...'}</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <span className="text-emerald-400 font-medium">New: {String(log.newValue).substring(0, 50)}{String(log.newValue).length > 50 && '...'}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
                     </div>
-                </div>
-
-                {/* Right: Submission Panel */}
-                <div className="bg-[#1e293b] p-8 rounded-2xl border border-gray-700 h-fit sticky top-10">
-                    {task.status === 'Review-Requested' ? (
-                        <div className="text-center py-10">
-                            <div className="w-16 h-16 bg-amber-500/20 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <Clock size={32} />
-                            </div>
-                            <h2 className="text-xl font-bold text-white mb-2">Under Review</h2>
-                            <p className="text-gray-400 text-sm">Your work has been submitted and is currently waiting for manager approval.</p>
-                        </div>
-                    ) : task.status === 'Merged' ? (
-                        <div className="text-center py-10">
-                            <div className="w-16 h-16 bg-emerald-500/20 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <CheckCircle size={32} />
-                            </div>
-                            <h2 className="text-xl font-bold text-white mb-2">Work Approved!</h2>
-                            <p className="text-gray-400 text-sm">This task has been successfully merged and closed.</p>
-                        </div>
-                    ) : (
-                        <>
-                            <h2 className="text-2xl font-bold text-white mb-6">Submit Work</h2>
-                            <form onSubmit={handleSubmitWork} className="space-y-6">
-                                {/* ... existing form inputs (githubUrl, file, comment) ... */}
-
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 transition disabled:opacity-50"
-                                >
-                                    {isSubmitting ? 'Submitting...' : <><CheckCircle size={20} /> Submit for Review</>}
-                                </button>
-                            </form>
-                        </>
-                    )}
-                </div>
+                )}
             </main>
         </div>
     );

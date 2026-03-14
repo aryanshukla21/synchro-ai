@@ -13,7 +13,7 @@ const validateEnv = () => {
         'SMTP_USER',
         'SMTP_PASS',
         'GEMINI_API_KEY',
-        'ENCRYPTION_KEY' // NEW: Ensures encryption utility won't crash
+        'ENCRYPTION_KEY' // Ensures encryption utility won't crash
     ];
 
     const missingVars = requiredVars.filter((key) => !process.env[key]);
@@ -57,6 +57,8 @@ const activityRoutes = require('./routes/activities');
 const notificationRoutes = require('./routes/notifications');
 const commentRoutes = require('./routes/comments');
 const workspaceRoutes = require('./routes/workspace');
+const searchRoutes = require('./routes/search');
+const timeLogRoutes = require('./routes/timelogs');
 
 // Import Services
 const notificationService = require('./services/notificationServices');
@@ -88,13 +90,13 @@ app.use(helmet({
 
 // Limit requests from same API
 const limiter = rateLimit({
-    max: 1500, // Limit each IP to 1500 requests per window (adjustable based on your traffic)
+    max: 1500, // Limit each IP to 1500 requests per window
     windowMs: 60 * 60 * 1000, // 1 Hour
     message: 'Too many requests from this IP, please try again in an hour.',
-    standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-    legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+    standardHeaders: true,
+    legacyHeaders: false,
 });
-app.use('/api', limiter); // Apply rate limiting to all /api routes
+app.use('/api', limiter);
 
 // 1. Standard Middleware
 app.use(cors({
@@ -104,19 +106,16 @@ app.use(cors({
 }));
 
 // Body parser, reading data from body into req.body
-app.use(express.json({ limit: '10mb' })); // Limit body payload size to 10mb to prevent payload overflow attacks
+app.use(express.json({ limit: '10mb' }));
 
 // Data sanitization against NoSQL query injection
-// This removes any keys containing prohibited characters like $ or .
 app.use(mongoSanitize());
 
 // 2. Socket.io Setup
-// CRITICAL: Initialize socket.io using the config/socket.js helper.
-// This single line handles the CORS, the ping limits, and the room joining logic automatically.
+// Initialize socket.io using the config/socket.js helper.
 const io = socketHelper.init(server);
 
 // 3. Initialize Services with Socket.io
-// Connects the notification service to the live socket
 notificationService.init(io);
 
 app.use((req, res, next) => {
@@ -133,9 +132,10 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/workspace', workspaceRoutes);
+app.use('/api/search', searchRoutes);
+app.use('/api/timelogs', timeLogRoutes);
 
 // 5. Global Error Handling Middleware
-// Replaced the generic inline handler with your robust custom error handler
 app.use(errorHandler);
 
 // --- SERVER STARTUP ---

@@ -3,6 +3,7 @@ const {
     createProject,
     getProjects,
     getProjectById,
+    getRecentProjects,
     inviteMember,
     deleteProject,
     updateProject,
@@ -10,14 +11,16 @@ const {
     rejectInvite,
     removeMember,
     updateIntegrations,
-    updateNotifications
+    updateNotifications,
+    updateProjectWorkflow,
+    getProjectAssets
 } = require('../controllers/projects.controller');
 const { protect } = require('../middleware/authMiddleware');
-
-// IMPORT THE NEW RBAC MIDDLEWARE
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 
 const router = express.Router();
+
+router.get('/recent', protect, getRecentProjects);
 
 router.route('/')
     .get(protect, getProjects)
@@ -48,7 +51,12 @@ router.put('/:id/integrations', protect, authorizeRoles('Owner', 'Co-Owner'), up
 // Update Webhook Notifications (Only Owners/Co-Owners)
 router.put('/:id/notifications', protect, authorizeRoles('Owner', 'Co-Owner'), updateNotifications);
 
+// Only Owners and Co-Owners can alter the Kanban columns and required fields
+router.put('/:id/workflow', protect, authorizeRoles('Owner', 'Co-Owner'), updateProjectWorkflow);
+
 // Only Owners and Co-Owners can kick people out
 router.delete('/:id/members/:memberId', protect, authorizeRoles('Owner', 'Co-Owner'), removeMember);
+
+router.get('/:id/assets', protect, authorizeRoles('Owner', 'Co-Owner', 'Contributor', 'Viewer'), getProjectAssets);
 
 module.exports = router;

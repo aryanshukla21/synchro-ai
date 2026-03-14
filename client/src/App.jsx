@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 
 // Pages
+import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -18,6 +19,13 @@ import ProjectReviews from './pages/ProjectReviews';
 import Settings from './pages/Settings';
 import JoinWorkspace from './pages/JoinWorkspace';
 import ProjectAuditLog from './pages/ProjectAuditLog';
+import GlobalSearch from './pages/GlobalSearch';
+import Analytics from './pages/Analytics';
+import ResourcePlanning from './pages/ResourcePlanning';
+import MyWork from './pages/MyWork';
+import ProjectAssets from './pages/ProjectAssets';
+import Timesheet from './pages/Timesheet';
+import IssuesTracker from './pages/IssuesTracker';
 
 // Components & Contexts
 import Layout from './components/Layout';
@@ -36,6 +44,13 @@ const PublicRoute = ({ children }) => {
   if (loading) return <div className="p-4 text-white flex justify-center items-center min-h-screen">Loading...</div>;
   // If user exists, send them to dashboard
   return user ? <Navigate to="/" replace /> : children;
+};
+
+const IndexRoute = () => {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen bg-[#0f172a]" />; // Smooth blank screen while checking auth
+  // If logged in -> Go to Dashboard. If logged out -> Show Landing Page.
+  return user ? <Navigate to="/dashboard" replace /> : <Home />;
 };
 
 function App() {
@@ -72,7 +87,11 @@ function App() {
 
             {/* Protected Routes */}
             <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/analytics" element={<Analytics />} />
+              <Route path="/workload" element={<ResourcePlanning />} />
+              <Route path="/my-work" element={<MyWork />} />
+              <Route path="/search" element={<GlobalSearch />} />
               <Route path="/my-projects" element={<MyProjects />} />
               <Route path="/kanban" element={<Kanban />} />
               <Route path="/project/:id" element={<ProjectDetails />} />
@@ -82,6 +101,9 @@ function App() {
               <Route path="/task/:id/work" element={<TaskWorkPage />} />
               <Route path="/project/:projectId/settings" element={<Settings />} />
               <Route path="/setup-password" element={<SetupPassword />} />
+              <Route path="/project/:projectId/assets" element={<ProjectAssets />} />
+              <Route path="/timesheet" element={<Timesheet />} />
+              <Route path="/project/:projectId/issues" element={<IssuesTracker />} />
             </Route>
 
             {/* Catch-all Route for 404 - MUST BE LAST */}

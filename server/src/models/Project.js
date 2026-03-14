@@ -32,13 +32,14 @@ const projectSchema = new mongoose.Schema({
             default: 'Pending'
         }
     }],
+
     // SECURE STORAGE: For your encryption.js utility output
     aiApiKey: {
         type: new mongoose.Schema({
             iv: { type: String },
             content: { type: String }
-        }, { _id: false }), // _id: false prevents creating an ID for this nested object
-        select: false       // Now Mongoose correctly hides this field by default
+        }, { _id: false }),
+        select: false
     },
 
     // WORKSPACE INTEGRATIONS ---
@@ -48,23 +49,23 @@ const projectSchema = new mongoose.Schema({
                 iv: { type: String },
                 content: { type: String }
             }, { _id: false }),
-            select: false // Hidden by default for security
+            select: false
         },
         githubToken: {
             type: new mongoose.Schema({
                 iv: { type: String },
                 content: { type: String }
             }, { _id: false }),
-            select: false // Hidden by default for security
+            select: false
         },
-        //Target Repository Path for PR Automation ---
+        // Target Repository Path for PR Automation ---
         githubRepoPath: {
             type: String,
             default: ''
         }
     },
 
-    // --- NEW: WORKSPACE NOTIFICATIONS ---
+    // --- WORKSPACE NOTIFICATIONS ---
     notifications: {
         slack: { type: String, default: '' },
         discord: { type: String, default: '' },
@@ -85,7 +86,16 @@ const projectSchema = new mongoose.Schema({
         type: String,
         enum: ['Planning', 'Active', 'Completed'],
         default: 'Planning'
-    }
+    },
+
+    // --- DYNAMIC KANBAN WORKFLOW ---
+    workflow: [{
+        name: { type: String, required: true },
+        order: { type: Number, default: 0 },
+        // Removed the strict enum here to allow you to easily add new rule types from the frontend later!
+        requiredFields: [{ type: String }],
+        autoAssignTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }
+    }]
 }, {
     timestamps: true,
     // These allow virtual fields (like tasks) to show up in JSON responses

@@ -9,6 +9,11 @@ import {
 } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import NotificationBell from '../components/NotificationBell';
+import RecentlyViewed from '../components/dashboard/RecentlyViewed';
+
+// --- NEW IMPORTS FOR CHARTS ---
+import OverallProgress from '../components/dashboard/OverallProgress';
+import WorkloadStatus from '../components/dashboard/WorkloadStatus';
 
 const Dashboard = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
@@ -64,17 +69,12 @@ const Dashboard = () => {
         e.preventDefault();
         try {
             const { data } = await api.post('/projects', newProject);
-
-            // Immediate State Update
             const createdProject = data.data;
             setProjects([createdProject, ...projects]);
-
             setShowModal(false);
             setNewProject({ name: '', description: '', aiApiKey: '' });
-
             showToast("Workspace created successfully!", "success");
         } catch (err) {
-            console.error(err);
             showToast(err.response?.data?.message || "Failed to create project", "error");
         }
     };
@@ -126,9 +126,7 @@ const Dashboard = () => {
                     <h1 className="text-xl font-bold text-white">Dashboard</h1>
                 </div>
                 <div className="flex items-center gap-6">
-                    {/* Notification Bell Component */}
                     <NotificationBell />
-
                     <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-medium shadow-lg shadow-indigo-900/20 transition">
                         <Plus size={18} /> <span className="hidden sm:inline">New Project</span>
                     </button>
@@ -165,9 +163,25 @@ const Dashboard = () => {
                     <StatCard label="Team Load" value={`${stats.teamLoad}%`} icon={<Activity size={24} />} color="text-indigo-400" bg="bg-indigo-500/10" />
                 </div>
 
+                {/* --- RECENTLY VIEWED --- */}
+                <RecentlyViewed />
+
+                {/* --- ANALYTICS CHARTS ROW (NEWLY ADDED) --- */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-1">
+                        {/* OverallProgress fetches its own data, we just render it */}
+                        <OverallProgress />
+                    </div>
+                    <div className="lg:col-span-2 flex flex-col">
+                        {/* WorkloadStatus requires the tasks array we fetched above */}
+                        <div className="flex-1">
+                            <WorkloadStatus tasks={myTasks} />
+                        </div>
+                    </div>
+                </div>
+
                 {/* --- ACTIVE WORKSPACES & TASKS --- */}
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-
                     {/* Left Column: Projects List */}
                     <div className="xl:col-span-2 space-y-6">
                         <div className="flex items-center justify-between">
@@ -178,8 +192,7 @@ const Dashboard = () => {
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-                            {/* 1. CREATE WORKSPACE CARD (Always First) */}
+                            {/* 1. CREATE WORKSPACE CARD */}
                             <button
                                 onClick={() => setShowModal(true)}
                                 className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 p-6 rounded-xl border-2 border-dashed border-indigo-500/50 hover:border-indigo-400 hover:bg-indigo-600/30 transition flex flex-col items-center justify-center text-white gap-3 min-h-[180px] group animate-in fade-in zoom-in duration-300"
@@ -266,7 +279,6 @@ const Dashboard = () => {
                             )}
                         </div>
                     </div>
-
                 </div>
             </main>
 

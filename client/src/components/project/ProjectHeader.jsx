@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import {
     Plus, MoreVertical, ChevronRight,
     Settings, X, Save, Loader2,
-    Download, FileText, Table, ClipboardCheck
+    Download, FileText, Table, ClipboardCheck,
+    FolderOpen
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
@@ -99,6 +100,23 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
 
                     <NotificationBell />
 
+                    {/* Files & Assets Button (Visible to all project members) --- */}
+                    <Link
+                        to={`/project/${project?._id}/assets`}
+                        className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-700 transition"
+                    >
+                        <FolderOpen size={18} />
+                        <span className="hidden sm:inline">Files</span>
+                    </Link>
+
+                    <Link
+                        to={`/project/${project?._id}/issues`}
+                        className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-rose-500/30 transition"
+                    >
+                        <Bug size={18} />
+                        <span className="hidden sm:inline">Issues</span>
+                    </Link>
+
                     {isOwner && (
                         <>
                             {/* Review Submissions Button */}
@@ -107,7 +125,7 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                                 className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-emerald-500/30 transition"
                             >
                                 <ClipboardCheck size={18} />
-                                <span className="hidden sm:inline">Review Submissions</span>
+                                <span className="hidden md:inline">Reviews</span>
                             </Link>
 
                             <Link
@@ -115,7 +133,7 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                                 className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3 py-2 rounded-lg flex items-center gap-2 text-sm font-medium border border-gray-700 transition"
                             >
                                 <Settings size={18} />
-                                <span className="hidden sm:inline">Settings</span>
+                                <span className="hidden md:inline">Settings</span>
                             </Link>
 
                             <button
@@ -123,7 +141,7 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 text-sm font-bold shadow-lg shadow-indigo-500/20 transition"
                             >
                                 <Plus size={18} />
-                                <span className="hidden sm:inline">New Task</span>
+                                <span className="hidden md:inline">New Task</span>
                             </button>
                         </>
                     )}

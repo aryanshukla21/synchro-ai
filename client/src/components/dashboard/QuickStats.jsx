@@ -1,3 +1,5 @@
+// Currently not used anywhere
+
 import { useState, useEffect } from 'react';
 import api from '../../api/axios'; // Ensure this path matches your folder structure
 

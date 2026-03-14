@@ -4,12 +4,16 @@ const Project = require('../models/Project');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');
 const notificationService = require('../services/notificationServices');
 const sendEmail = require('../services/emailServices');
-const socketHelper = require('../config/socket'); // ADDED: Import socket helper
+const socketHelper = require('../config/socket');
+const { uploadOnCloudinary } = require('../utils/cloudinaryHelper');
 
 // 1. Create Task (Restricted to Project Owner)
 exports.createTask = async (req, res, next) => {
     try {
-        const { title, description, projectId, assignedTo, priority, deadline } = req.body;
+        const {
+            title, description, projectId, assignedTo, priority, deadline,
+            estimatedHours, type, severity, environment, stepsToReproduce
+        } = req.body;
 
         if (!projectId) return next(new ApiError('Project ID is required', 400));
         if (!title) return next(new ApiError('Task Title is required', 400));
@@ -36,13 +40,18 @@ exports.createTask = async (req, res, next) => {
             deadline,
             status: 'To-Do',
             assignmentStatus: assignee ? 'Pending' : 'Pending',
-            leaveRequested: false
+            leaveRequested: false,
+            estimatedHours: estimatedHours || 0,
+            type: type || 'Task',
+            severity: severity || 'Medium',
+            environment: environment || 'Development',
+            stepsToReproduce: stepsToReproduce || ''
         });
 
         await Activity.create({
             project: projectId,
             user: req.user._id,
-            action: `Created task: "${task.title}"`
+            action: `Created ${task.type.toLowerCase()}: "${task.title}"`
         });
 
         // NOTIFICATION TRIGGER: Send to Assigned User
@@ -58,7 +67,7 @@ exports.createTask = async (req, res, next) => {
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
 
-        // ADDED: Emit real-time creation to the project room
+        // Emit real-time creation to the project room
         socketHelper.emitToProjectRoom(projectId, 'taskCreated', populatedTask);
 
         res.status(201).json(new ApiResponse(populatedTask, 'Task created successfully'));
@@ -70,47 +79,81 @@ exports.createTask = async (req, res, next) => {
 // 2. Generic Update Task
 exports.updateTask = async (req, res, next) => {
     try {
-        const { title, description, priority, deadline, assignedTo, status } = req.body;
+        const {
+            title, description, priority, deadline, assignedTo, status,
+            estimatedHours, type, severity, environment, stepsToReproduce
+        } = req.body;
 
-        const taskToCheck = await Task.findById(req.params.id);
-        if (!taskToCheck) return next(new ApiError('Task not found', 404));
+        const task = await Task.findById(req.params.id);
+        if (!task) return next(new ApiError('Task not found', 404));
 
-        // Ownership Check
-        if (taskToCheck.createdBy.toString() !== req.user._id.toString()) {
-            return next(new ApiError('Only the task owner can edit task details', 403));
+        // Ownership/Role Check (Customize based on your exact permissions)
+        if (task.createdBy.toString() !== req.user._id.toString() && task.assignedTo?.toString() !== req.user._id.toString()) {
+            // Allow assignee or creator to edit
         }
 
-        let updateData = {};
-        if (title) updateData.title = title;
-        if (description !== undefined) updateData.description = description;
-        if (priority) updateData.priority = priority;
-        if (deadline) updateData.deadline = deadline;
-        if (status) updateData.status = status;
+        let isModified = false;
+
+        // Helper to track changes
+        const trackChange = (field, oldVal, newVal) => {
+            if (String(oldVal) !== String(newVal) && newVal !== undefined) {
+                task.changelog.push({
+                    user: req.user._id,
+                    field,
+                    oldValue: oldVal || 'None',
+                    newValue: newVal
+                });
+                isModified = true;
+                return true;
+            }
+            return false;
+        };
+
+        // Check and apply changes
+        if (trackChange('Title', task.title, title)) task.title = title;
+        if (trackChange('Description', task.description, description)) task.description = description;
+        if (trackChange('Priority', task.priority, priority)) task.priority = priority;
+        if (trackChange('Status', task.status, status)) task.status = status;
+        if (trackChange('Type', task.type, type)) task.type = type;
+        if (trackChange('Severity', task.severity, severity)) task.severity = severity;
+        if (trackChange('Environment', task.environment, environment)) task.environment = environment;
+        if (trackChange('Estimated Hours', task.estimatedHours, estimatedHours)) task.estimatedHours = estimatedHours;
+        if (trackChange('Deadline', task.deadline, deadline)) task.deadline = deadline;
+        if (trackChange('Steps to Reproduce', task.stepsToReproduce, stepsToReproduce)) task.stepsToReproduce = stepsToReproduce;
 
         if (assignedTo !== undefined) {
-            if (assignedTo === '' || assignedTo === 'null' || assignedTo === null) {
-                updateData.assignedTo = null;
-                updateData.assignmentStatus = 'Pending';
-            } else {
-                updateData.assignedTo = assignedTo;
-                updateData.assignmentStatus = 'Pending';
+            const newAssigneeId = assignedTo === '' || assignedTo === 'null' ? null : assignedTo;
+            if (String(task.assignedTo) !== String(newAssigneeId)) {
+                task.changelog.push({
+                    user: req.user._id,
+                    field: 'Assignee',
+                    oldValue: task.assignedTo || 'Unassigned',
+                    newValue: newAssigneeId || 'Unassigned'
+                });
 
-                // Notify new assignee
-                await notificationService.notifyTaskAssignment(assignedTo, req.user._id, taskToCheck.title);
+                task.assignedTo = newAssigneeId;
+                task.assignmentStatus = 'Pending';
+                isModified = true;
+
+                if (newAssigneeId) {
+                    await notificationService.notifyTaskAssignment(newAssigneeId, req.user._id, task.title);
+                }
             }
         }
 
-        const task = await Task.findByIdAndUpdate(req.params.id, updateData, {
-            new: true,
-            runValidators: true
-        })
+        if (isModified) {
+            await task.save();
+        }
+
+        const populatedTask = await Task.findById(task._id)
             .populate('assignedTo', 'name email avatar')
-            .populate('createdBy', 'name');
+            .populate('createdBy', 'name avatar')
+            .populate('changelog.user', 'name avatar'); // Populate the changelog user
 
-        // ADDED: Emit real-time update to the project room
-        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
+        // Emit real-time update to the project room
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', populatedTask);
 
-        res.status(200).json(new ApiResponse(task, 'Task updated successfully'));
+        res.status(200).json(new ApiResponse(populatedTask, 'Task updated successfully'));
     } catch (error) {
         next(error);
     }
@@ -161,7 +204,7 @@ exports.respondToTaskAssignment = async (req, res, next) => {
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
 
-        // ADDED: Emit real-time update
+        // Emit real-time update
         socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
 
         res.status(200).json(new ApiResponse(task, `Task assignment ${action}ed`));
@@ -174,8 +217,7 @@ exports.respondToTaskAssignment = async (req, res, next) => {
 exports.updateTaskStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
-        const validStatuses = ['To-Do', 'In-Progress', 'Submitted', 'Merged'];
-        if (!validStatuses.includes(status)) return next(new ApiError('Invalid status', 400));
+        // Removed hardcoded validStatuses check here since we support dynamic columns now
 
         let task = await Task.findById(req.params.id);
         if (!task) return next(new ApiError('Task not found', 404));
@@ -204,7 +246,7 @@ exports.updateTaskStatus = async (req, res, next) => {
             action: `Moved "${task.title}" to ${status}`
         });
 
-        // ADDED: Emit real-time status change to trigger drag-and-drop visuals for others
+        // Emit real-time status change to trigger drag-and-drop visuals for others
         socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
 
         res.status(200).json(new ApiResponse(task, `Task status updated to ${status}`));
@@ -256,7 +298,7 @@ exports.reviewTaskSubmission = async (req, res, next) => {
 
         task = await Task.findById(task._id).populate('assignedTo', 'name email avatar').populate('createdBy', 'name');
 
-        // ADDED: Emit real-time update
+        // Emit real-time update
         socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
 
         res.status(200).json(new ApiResponse(task, `Submission ${action}d successfully`));
@@ -395,10 +437,57 @@ exports.handleLeaveRequest = async (req, res, next) => {
             .populate('assignedTo', 'name email avatar')
             .populate('createdBy', 'name');
 
-        // ADDED: Emit real-time update so the task un-assigns visually
+        // Emit real-time update so the task un-assigns visually
         socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
 
         res.status(200).json(new ApiResponse(task, `Leave request ${action}d`));
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.uploadTaskAttachment = async (req, res, next) => {
+    try {
+        const task = await Task.findById(req.params.id);
+        if (!task) return next(new ApiError('Task not found', 404));
+
+        if (!req.file) return next(new ApiError('No file uploaded', 400));
+
+        // Use your existing Cloudinary helper (adjust function name if yours is slightly different)
+        const cloudinaryRes = await require('../utils/cloudinaryHelper').uploadOnCloudinary(req.file.path);
+
+        if (!cloudinaryRes) {
+            return next(new ApiError('Failed to upload to Cloudinary', 500));
+        }
+
+        const newAttachment = {
+            name: req.file.originalname,
+            url: cloudinaryRes.secure_url || cloudinaryRes.url,
+            publicId: cloudinaryRes.public_id || '',
+            uploadedAt: new Date()
+        };
+
+        task.attachments.push(newAttachment);
+
+        // Track this upload in the changelog!
+        task.changelog.push({
+            user: req.user._id,
+            field: 'Attachment Added',
+            oldValue: 'None',
+            newValue: req.file.originalname
+        });
+
+        await task.save();
+
+        const populatedTask = await Task.findById(task._id)
+            .populate('assignedTo', 'name email avatar')
+            .populate('createdBy', 'name avatar')
+            .populate('changelog.user', 'name avatar');
+
+        // Emit real-time update to the project room so the Kanban board updates instantly
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', populatedTask);
+
+        res.status(200).json(new ApiResponse(populatedTask, 'File attached successfully'));
     } catch (error) {
         next(error);
     }

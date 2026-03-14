@@ -35,6 +35,17 @@ module.exports = {
                 socket.leave(`project_${projectId}`);
             });
 
+            // --- TASK LOCKING & PRESENCE INDICATORS ---
+            socket.on('task-typing-start', ({ projectId, taskId, user }) => {
+                // Broadcast to everyone ELSE in the project room that this user is editing this specific task
+                socket.to(`project_${projectId}`).emit('task-being-edited', { taskId, user });
+            });
+
+            socket.on('task-typing-stop', ({ projectId, taskId, user }) => {
+                // Broadcast that the user has stopped editing
+                socket.to(`project_${projectId}`).emit('task-stopped-editing', { taskId, user });
+            });
+
             socket.on('disconnect', () => {
                 console.log('User disconnected:', socket.id);
                 // Socket.io automatically handles room cleanup on disconnect

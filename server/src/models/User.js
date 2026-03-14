@@ -28,6 +28,16 @@ const userSchema = new mongoose.Schema({
         type: String,
         default: 'https://cdn-icons-png.flaticon.com/512/149/149071.png'
     },
+    recentProjects: [{
+        project: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Project'
+        },
+        viewedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     skills: {
         type: [String],
         default: []

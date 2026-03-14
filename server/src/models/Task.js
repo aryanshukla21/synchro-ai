@@ -28,7 +28,7 @@ const taskSchema = new mongoose.Schema({
         default: null
     },
 
-    // NEW FIELDS FOR WORKFLOW
+    // WORKFLOW FIELDS
     assignmentStatus: {
         type: String,
         enum: ['Pending', 'Accepted', 'Declined'],
@@ -47,10 +47,50 @@ const taskSchema = new mongoose.Schema({
     },
     status: {
         type: String,
-        enum: ['To-Do', 'In-Progress', 'Submitted', 'Merged'],
-        default: 'To-Do'
+        default: 'To-Do' // Defaults to the first column of the project in reality
     },
-    deadline: { type: Date }
+    metadata: {
+        prLink: { type: String, default: '' },
+        reviewNotes: { type: String, default: '' }
+    },
+    attachments: [{
+        name: String,
+        url: String,
+        publicId: String,
+        uploadedAt: { type: Date, default: Date.now }
+    }],
+    deadline: { type: Date },
+
+    // TIMESHEET FIELD
+    estimatedHours: { type: Number, default: 0 },
+
+    // --- ISSUES / BUG TRACKER FIELDS ---
+    type: {
+        type: String,
+        enum: ['Task', 'Bug'],
+        default: 'Task'
+    },
+    severity: {
+        type: String,
+        enum: ['Low', 'Medium', 'High', 'Critical'],
+        default: 'Medium'
+    },
+    environment: {
+        type: String,
+        enum: ['Development', 'Staging', 'Production'],
+        default: 'Development'
+    },
+    stepsToReproduce: {
+        type: String,
+        default: ''
+    },
+    changelog: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        field: { type: String }, // e.g., "Status", "Priority", "Title"
+        oldValue: { type: mongoose.Schema.Types.Mixed },
+        newValue: { type: mongoose.Schema.Types.Mixed },
+        changedAt: { type: Date, default: Date.now }
+    }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Task', taskSchema);

@@ -2,6 +2,8 @@ const Project = require('../models/Project');
 const User = require('../models/User');
 const Activity = require('../models/Activity');
 const Task = require('../models/Task');
+const Submission = require('../models/Submission');
+const Comment = require('../models/Comment');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');
 const { encrypt } = require('../utils/encryption');
 const sendEmail = require('../services/emailServices');
@@ -45,40 +47,35 @@ exports.createProject = async (req, res, next) => {
 };
 
 // get all projects for logged-in user
-exports.getProjects = async (req, res, next) => {
+exports.getProject = async (req, res, next) => {
     try {
-        // Pagination setup
-        const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 20; // 20 projects per page
-        const skip = (page - 1) * limit;
-
-        // Base query: Owner OR Member
-        const query = {
-            $or: [
-                { owner: req.user._id },
-                { members: { $elemMatch: { user: req.user._id } } }
-            ]
-        };
-
-        // Calculate total for pagination metadata
-        const total = await Project.countDocuments(query);
-
-        // Fetch limited results
-        const projects = await Project.find(query)
+        const project = await Project.findById(req.params.id)
             .populate('owner', 'name email avatar')
-            .populate('members.user', 'name email avatar')
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
+            .populate('members.user', 'name email avatar');
 
-        const pagination = {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit)
-        };
+        if (!project) {
+            throw new ApiError(404, 'Project not found');
+        }
 
-        res.status(200).json(new ApiResponse(projects, 'Projects retrieved successfully', 200, pagination));
+        // --- NEW: Track Recently Viewed ---
+        const user = await User.findById(req.user._id);
+        if (user) {
+            // Remove the project if it's already in the list to prevent duplicates
+            user.recentProjects = user.recentProjects?.filter(rp => rp.project?.toString() !== project._id.toString()) || [];
+
+            // Push it to the top of the history
+            user.recentProjects.unshift({ project: project._id, viewedAt: new Date() });
+
+            // Keep only the 5 most recent
+            if (user.recentProjects.length > 5) {
+                user.recentProjects = user.recentProjects.slice(0, 5);
+            }
+
+            await user.save({ validateBeforeSave: false }); // Skip validation for untouched fields
+        }
+        // ----------------------------------
+
+        res.status(200).json(new ApiResponse(project, 'Project retrieved successfully'));
     } catch (error) {
         next(error);
     }
@@ -318,8 +315,6 @@ exports.deleteProject = async (req, res, next) => {
     }
 };
 
-// --- CRITICAL UPDATES: Using $set to protect hidden encrypted fields ---
-
 exports.updateProject = async (req, res, next) => {
     try {
         const { title, description, aiApiKey } = req.body;
@@ -406,6 +401,160 @@ exports.updateNotifications = async (req, res, next) => {
         });
 
         res.status(200).json(new ApiResponse(project.notifications, 'Notification preferences updated'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.getRecentProjects = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.user._id).populate({
+            path: 'recentProjects.project',
+            select: 'title description status updatedAt'
+        });
+
+        if (!user || !user.recentProjects) {
+            return res.status(200).json(new ApiResponse([], 'No recent projects found'));
+        }
+
+        // Filter out any projects that might have been deleted by the owner
+        const validRecentProjects = user.recentProjects
+            .filter(rp => rp.project != null)
+            .map(rp => ({
+                ...rp.project.toObject(),
+                viewedAt: rp.viewedAt
+            }));
+
+        res.status(200).json(new ApiResponse(validRecentProjects, 'Recent projects retrieved successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.updateProjectWorkflow = async (req, res, next) => {
+    try {
+        const { projectId } = req.params;
+        const { workflow } = req.body;
+
+        // Verify user is owner or admin (add your role check logic here)
+        const project = await Project.findById(projectId);
+        if (!project) return res.status(404).json(new ApiResponse(null, 'Project not found', 404));
+
+        project.workflow = workflow;
+        await project.save();
+
+        res.status(200).json(new ApiResponse(project.workflow, 'Workflow updated successfully'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+exports.getProjectAssets = async (req, res, next) => {
+    try {
+        const { id: projectId } = req.params;
+
+        // 1. Fetch all tasks in the project
+        const tasks = await Task.find({ project: projectId })
+            .select('_id title attachments creator createdAt')
+            .populate('creator', 'name avatar');
+
+        const taskIds = tasks.map(t => t._id);
+
+        // 2. Fetch all submissions & comments related to those tasks
+        const submissions = await Submission.find({ task: { $in: taskIds } })
+            .populate('submittedBy', 'name avatar')
+            .populate('task', 'title');
+
+        const comments = await Comment.find({ task: { $in: taskIds } })
+            .populate('author', 'name avatar')
+            .populate('task', 'title');
+
+        let assets = [];
+
+        // Helper to determine file type from URL or extension
+        const getFileType = (url) => {
+            if (!url) return 'document';
+            const lowerUrl = url.toLowerCase();
+            if (lowerUrl.match(/\.(jpeg|jpg|gif|png|webp|svg)$/)) return 'image';
+            if (lowerUrl.match(/\.(mp4|webm|mov)$/)) return 'video';
+            if (lowerUrl.match(/\.(pdf)$/)) return 'pdf';
+            if (lowerUrl.match(/\.(zip|tar|gz|rar)$/)) return 'archive';
+            return 'document';
+        };
+
+        // 3. Extract Task Attachments
+        tasks.forEach(task => {
+            if (task.attachments && Array.isArray(task.attachments)) {
+                task.attachments.forEach(att => {
+                    const url = typeof att === 'string' ? att : att.url;
+                    if (url) {
+                        assets.push({
+                            _id: Math.random().toString(36).substr(2, 9),
+                            name: att.name || url.split('/').pop().split('?')[0] || 'Task File',
+                            url: url,
+                            type: getFileType(url),
+                            source: 'Task Attachment',
+                            sourceTitle: task.title,
+                            taskId: task._id,
+                            uploadedBy: task.creator,
+                            createdAt: task.createdAt
+                        });
+                    }
+                });
+            }
+        });
+
+        // 4. Extract Submission Files
+        submissions.forEach(sub => {
+            const processFile = (url, name) => {
+                if (url) {
+                    assets.push({
+                        _id: Math.random().toString(36).substr(2, 9),
+                        name: name || url.split('/').pop().split('?')[0] || 'Submission File',
+                        url: url,
+                        type: getFileType(url),
+                        source: 'Task Submission',
+                        sourceTitle: sub.task?.title || 'Unknown Task',
+                        taskId: sub.task?._id,
+                        uploadedBy: sub.submittedBy,
+                        createdAt: sub.createdAt
+                    });
+                }
+            };
+
+            if (sub.files && Array.isArray(sub.files)) {
+                sub.files.forEach(f => processFile(typeof f === 'string' ? f : f.url, f.name));
+            } else if (sub.fileUrl) {
+                processFile(sub.fileUrl, sub.fileName);
+            }
+        });
+
+        // 5. Extract Comment Attachments
+        comments.forEach(comment => {
+            if (comment.attachments && Array.isArray(comment.attachments)) {
+                comment.attachments.forEach(att => {
+                    const url = typeof att === 'string' ? att : att.url;
+                    if (url) {
+                        assets.push({
+                            _id: Math.random().toString(36).substr(2, 9),
+                            name: att.name || url.split('/').pop().split('?')[0] || 'Comment File',
+                            url: url,
+                            type: getFileType(url),
+                            source: 'Comment',
+                            sourceTitle: comment.task?.title || 'Task Thread',
+                            taskId: comment.task?._id,
+                            uploadedBy: comment.author,
+                            createdAt: comment.createdAt
+                        });
+                    }
+                });
+            }
+        });
+
+        // Sort by newest first
+        assets.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        res.status(200).json(new ApiResponse(assets, 'Project assets retrieved successfully'));
     } catch (error) {
         next(error);
     }
