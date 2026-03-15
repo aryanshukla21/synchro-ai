@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
-import { generatePDF, generateCSV } from '../utils/reportGenerator'; // <--- NEW IMPORT
+import { generatePDF, generateCSV } from '../utils/reportGenerator';
 
 // Components
 import ProjectHeader from '../components/project/ProjectHeader';
@@ -144,11 +144,11 @@ const ProjectDetails = () => {
             const res = await api.post(`/projects/${id}/invite`, { email, role });
             setProject(res.data.data);
             showToast(`Invitation sent to ${email}`, "success");
-
-            // Refresh Log to show "Admin invited User"
             refreshActivityLog();
         } catch (err) {
-            showToast(err.response?.data?.message || "Failed to invite user", "error");
+            const errorMessage = err.response?.data?.message || "User does not exist";
+            showToast(errorMessage, "error");
+            throw err;
         }
     };
 
@@ -160,8 +160,23 @@ const ProjectDetails = () => {
     if (loading) return <div className="flex items-center justify-center h-screen bg-[#0f172a] text-white animate-pulse">Loading Workspace...</div>;
     if (error || !project) return <div className="flex items-center justify-center h-screen bg-[#0f172a] text-red-400">Error: {error || "Project not found"}</div>;
 
-    const isOwner = currentUser?._id === (project.owner?._id || project.owner);
+    // 🔥 FIX 1: Force both IDs to be strings so the Owner check never fails
+    const isOwner = String(currentUser?._id) === String(project.owner?._id || project.owner);
     const activeMembers = project.members.filter(m => m.status === 'Active');
+
+    // 🔥 FIX 2: Force assignee IDs to strings so Contributors see their tasks!
+    const visibleTasks = isOwner
+        ? tasks
+        : tasks.filter(task => {
+            if (!task.assignedTo) return false;
+
+            // Handle both populated objects { _id: '...' } and raw IDs '...'
+            const assigneeId = typeof task.assignedTo === 'object'
+                ? task.assignedTo._id
+                : task.assignedTo;
+
+            return assigneeId === currentUser?._id;
+        });
 
     const totalTasks = tasks.length;
     const completedTasks = tasks.filter(t => t.status === 'Merged').length;
@@ -192,8 +207,8 @@ const ProjectDetails = () => {
                 onTaskCreate={() => setShowCreateTask(true)}
                 onUpdateProject={handleUpdateProject}
                 isOwner={isOwner}
-                onExportPDF={handleExportPDF} // <--- Pass down handler
-                onExportCSV={handleExportCSV} // <--- Pass down handler
+                onExportPDF={handleExportPDF}
+                onExportCSV={handleExportCSV}
             />
 
             <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-700">
@@ -215,9 +230,9 @@ const ProjectDetails = () => {
 
                         {/* PROJECT TASKS LIST WITH UPDATE HANDLER */}
                         <AllProjectTasks
-                            tasks={tasks}
+                            tasks={visibleTasks} // 🔥 UPDATED: passing visibleTasks instead of all tasks
                             isOwner={isOwner}
-                            onTaskUpdate={handleTaskUpdate} // Pass the handler here
+                            onTaskUpdate={handleTaskUpdate}
                         />
 
                         <ActivityLog activities={activities} />

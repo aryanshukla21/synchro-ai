@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { AlertCircle, Clock, UserX, User } from 'lucide-react';
-import TaskDetailPanel from '../kanban/TaskDetailPanel'; // Ensure path is correct
+import { AlertCircle, Clock, UserX, User, Target } from 'lucide-react'; // Added Target icon
+import TaskDetailPanel from '../kanban/TaskDetailPanel';
 
 const AllProjectTasks = ({ tasks, isOwner, onTaskUpdate }) => {
     const [selectedTask, setSelectedTask] = useState(null);
@@ -34,34 +34,33 @@ const AllProjectTasks = ({ tasks, isOwner, onTaskUpdate }) => {
     // 1. Define Priority Weights for Sorting
     const priorityWeight = { 'High': 3, 'Medium': 2, 'Low': 1 };
 
-    // 2. Group and Sort Tasks
-    const statusOrder = ['Submitted', 'In-Progress', 'To-Do', 'Merged'];
-
+    // 2. Filter tasks
     const visibleTasks = tasks.filter(t => t.assignmentStatus !== 'Declined');
 
-    // Group tasks by status
-    const groupedTasks = statusOrder.reduce((acc, status) => {
-        const tasksInStatus = visibleTasks
-            .filter(t => t.status === status)
-            .sort((a, b) => priorityWeight[b.priority] - priorityWeight[a.priority]); // Sort by priority inside status
-
-        if (tasksInStatus.length > 0) acc[status] = tasksInStatus;
-        return acc;
-    }, {});
-
-    if (!isOwner) return null;
+    // Note: Since ProjectDetails already filters 'tasks' for contributors, 
+    // this component will now naturally show only their tasks.
 
     return (
         <div className="bg-[#1e293b] rounded-2xl border border-gray-700 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 mt-6 shadow-xl relative">
-            {/* Header */}
+            {/* Header - Dynamically changing title based on role */}
             <div className="p-5 border-b border-gray-700 flex justify-between items-center bg-gray-800/50">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    <AlertCircle size={18} className="text-indigo-400" />
-                    All Project Tasks
-                    <span className="text-xs font-normal text-gray-500 ml-2">(Click task to review)</span>
+                    {isOwner ? (
+                        <>
+                            <AlertCircle size={18} className="text-indigo-400" />
+                            All Project Tasks
+                            <span className="text-xs font-normal text-gray-500 ml-2">(Click task to review)</span>
+                        </>
+                    ) : (
+                        <>
+                            <Target size={18} className="text-emerald-400" />
+                            My Assigned Tasks
+                            <span className="text-xs font-normal text-gray-500 ml-2">(Click to view details)</span>
+                        </>
+                    )}
                 </h3>
                 <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded border border-gray-700">
-                    {visibleTasks.length} Active
+                    {visibleTasks.length} {isOwner ? 'Active' : 'Assigned'}
                 </span>
             </div>
 
@@ -98,10 +97,10 @@ const AllProjectTasks = ({ tasks, isOwner, onTaskUpdate }) => {
                                             {task.assignedTo ? (
                                                 <div className="flex items-center gap-2">
                                                     <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] text-white shrink-0">
-                                                        {task.assignedTo.name?.charAt(0) || <User size={12} />}
+                                                        {(typeof task.assignedTo === 'object' ? task.assignedTo.name : 'U')?.charAt(0) || <User size={12} />}
                                                     </div>
                                                     <span className="text-xs text-gray-400 truncate max-w-[80px]">
-                                                        {task.assignedTo.name}
+                                                        {typeof task.assignedTo === 'object' ? task.assignedTo.name : 'Assigned'}
                                                     </span>
                                                 </div>
                                             ) : (
@@ -144,7 +143,7 @@ const AllProjectTasks = ({ tasks, isOwner, onTaskUpdate }) => {
                     </table>
                 ) : (
                     <div className="text-center py-12 text-gray-500 text-sm">
-                        No active tasks found for this project.
+                        {isOwner ? "No active tasks found for this project." : "No tasks have been assigned to you yet."}
                     </div>
                 )}
             </div>
@@ -155,8 +154,8 @@ const AllProjectTasks = ({ tasks, isOwner, onTaskUpdate }) => {
                     task={selectedTask}
                     onClose={() => setSelectedTask(null)}
                     onUpdate={(updatedTask) => {
-                        onTaskUpdate(updatedTask); // Update parent (ProjectDetails)
-                        setSelectedTask(updatedTask); // Keep sidebar in sync
+                        onTaskUpdate(updatedTask);
+                        setSelectedTask(updatedTask);
                     }}
                 />
             )}

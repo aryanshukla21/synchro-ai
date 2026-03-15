@@ -27,8 +27,8 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
 
-    // Create Project Form State
-    const [newProject, setNewProject] = useState({ name: '', description: '', aiApiKey: '' });
+    // FIX: Changed 'name' to 'title' to match backend expectation
+    const [newProject, setNewProject] = useState({ title: '', description: '', aiApiKey: '' });
 
     // --- FILTERING LOGIC ---
     const pendingInvites = projects.filter(p => {
@@ -68,12 +68,12 @@ const Dashboard = () => {
     const handleCreateProject = async (e) => {
         e.preventDefault();
         try {
-            const { data } = await api.post('/projects', newProject);
-            const createdProject = data.data;
-            setProjects([createdProject, ...projects]);
+            await api.post('/projects', newProject);
             setShowModal(false);
-            setNewProject({ name: '', description: '', aiApiKey: '' });
+            setNewProject({ title: '', description: '', aiApiKey: '' });
             showToast("Workspace created successfully!", "success");
+            // FIX: Instantly refetch all data so the new project is populated properly
+            fetchData();
         } catch (err) {
             showToast(err.response?.data?.message || "Failed to create project", "error");
         }
@@ -166,14 +166,12 @@ const Dashboard = () => {
                 {/* --- RECENTLY VIEWED --- */}
                 <RecentlyViewed />
 
-                {/* --- ANALYTICS CHARTS ROW (NEWLY ADDED) --- */}
+                {/* --- ANALYTICS CHARTS ROW --- */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-1">
-                        {/* OverallProgress fetches its own data, we just render it */}
                         <OverallProgress />
                     </div>
                     <div className="lg:col-span-2 flex flex-col">
-                        {/* WorkloadStatus requires the tasks array we fetched above */}
                         <div className="flex-1">
                             <WorkloadStatus tasks={myTasks} />
                         </div>
@@ -206,8 +204,8 @@ const Dashboard = () => {
                                 </div>
                             </button>
 
-                            {/* 2. Existing Projects */}
-                            {activeProjects.slice(0, 5).map((project) => (
+                            {/* 2. Existing Projects (FIX: .slice(0, 3) restricts to only 3 items) */}
+                            {activeProjects.slice(0, 3).map((project) => (
                                 <Link
                                     key={project._id}
                                     to={`/project/${project._id}`}
@@ -297,8 +295,8 @@ const Dashboard = () => {
                                 <label className="text-sm font-medium text-gray-400 mb-1 block">Workspace Name *</label>
                                 <input
                                     className="w-full p-3 bg-[#0f172a] border border-gray-600 rounded-lg text-white focus:border-indigo-500 focus:outline-none transition"
-                                    value={newProject.name}
-                                    onChange={e => setNewProject({ ...newProject, name: e.target.value })}
+                                    value={newProject.title}
+                                    onChange={e => setNewProject({ ...newProject, title: e.target.value })}
                                     placeholder="e.g. AI Research Platform"
                                     required
                                 />

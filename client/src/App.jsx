@@ -66,6 +66,7 @@ function App() {
 
         <div className="min-h-screen bg-[#0f172a] text-gray-300 font-sans">
           <Routes>
+            <Route path="/" element={<IndexRoute />} />
             {/* Public Routes */}
             <Route path="/login" element={
               <PublicRoute>

@@ -13,7 +13,6 @@ exports.createProject = async (req, res, next) => {
     try {
         const { title, description, aiApiKey } = req.body;
 
-        // create project data with owner
         const projectData = {
             title,
             description,
@@ -21,63 +20,36 @@ exports.createProject = async (req, res, next) => {
             members: [{ user: req.user._id, role: 'Owner', status: 'Active' }]
         };
 
-        // encrypt api key
         if (aiApiKey) {
             projectData.aiApiKey = encrypt(aiApiKey);
         }
 
-        // create project
         const project = await Project.create(projectData);
 
-        // log initial activity
         await Activity.create({
             project: project._id,
             user: req.user._id,
             action: `Created Workspace: "${title}"`
         });
 
-        res.status(201).json(new ApiResponse(
-            project,
-            'Project created successfully',
-            201
-        ));
+        res.status(201).json(new ApiResponse(project, 'Project created successfully', 201));
     } catch (error) {
         next(error);
     }
 };
 
 // get all projects for logged-in user
-exports.getProject = async (req, res, next) => {
+exports.getProjects = async (req, res, next) => {
     try {
-        const project = await Project.findById(req.params.id)
+        // Find all projects where the logged-in user is a member
+        const projects = await Project.find({ 'members.user': req.user._id })
             .populate('owner', 'name email avatar')
-            .populate('members.user', 'name email avatar');
+            .populate('members.user', 'name email avatar')
+            .sort({ updatedAt: -1 });
 
-        if (!project) {
-            throw new ApiError(404, 'Project not found');
-        }
-
-        // --- NEW: Track Recently Viewed ---
-        const user = await User.findById(req.user._id);
-        if (user) {
-            // Remove the project if it's already in the list to prevent duplicates
-            user.recentProjects = user.recentProjects?.filter(rp => rp.project?.toString() !== project._id.toString()) || [];
-
-            // Push it to the top of the history
-            user.recentProjects.unshift({ project: project._id, viewedAt: new Date() });
-
-            // Keep only the 5 most recent
-            if (user.recentProjects.length > 5) {
-                user.recentProjects = user.recentProjects.slice(0, 5);
-            }
-
-            await user.save({ validateBeforeSave: false }); // Skip validation for untouched fields
-        }
-        // ----------------------------------
-
-        res.status(200).json(new ApiResponse(project, 'Project retrieved successfully'));
+        res.status(200).json(new ApiResponse(projects, 'Projects retrieved successfully'));
     } catch (error) {
-        next(error);
+        next(new ApiError(error.message || 'Error fetching projects', 500));
     }
 };
 
@@ -87,7 +59,6 @@ exports.getProjectById = async (req, res, next) => {
         const project = await Project.findById(req.params.id)
             .populate('owner', 'name email avatar')
             .populate('members.user', 'name email avatar')
-            // --- NESTED POPULATION ---
             .populate({
                 path: 'tasks',
                 populate: {
@@ -107,6 +78,18 @@ exports.getProjectById = async (req, res, next) => {
             return next(new ApiError('Project not found', 404));
         }
 
+        // --- Track Recently Viewed ---
+        const user = await User.findById(req.user._id);
+        if (user) {
+            user.recentProjects = user.recentProjects?.filter(rp => rp.project?.toString() !== project._id.toString()) || [];
+            user.recentProjects.unshift({ project: project._id, viewedAt: new Date() });
+
+            if (user.recentProjects.length > 5) {
+                user.recentProjects = user.recentProjects.slice(0, 5);
+            }
+            await user.save({ validateBeforeSave: false });
+        }
+
         res.status(200).json(new ApiResponse(project, 'Project details retrieved successfully'));
     } catch (error) {
         next(error);
@@ -120,7 +103,6 @@ exports.inviteMember = async (req, res, next) => {
 
         if (!project) return next(new ApiError('Project not found', 404));
 
-        // AUTH CHECK: Only Owner or Co-Owners can invite
         const isOwner = project.owner.toString() === req.user._id.toString();
         const isCoOwner = project.members.some(m =>
             m.user.toString() === req.user._id.toString() &&
@@ -138,7 +120,6 @@ exports.inviteMember = async (req, res, next) => {
         const isAlreadyMember = project.members.some(m => m.user.toString() === userToInvite._id.toString());
         if (isAlreadyMember) return next(new ApiError('User is already in this project', 400));
 
-        // Add to project members
         project.members.push({
             user: userToInvite._id,
             role: role || 'Contributor',
@@ -147,7 +128,6 @@ exports.inviteMember = async (req, res, next) => {
 
         await project.save();
 
-        // EMAIL SERVICE TRIGGER
         try {
             await sendEmail({
                 email: userToInvite.email,
@@ -175,13 +155,11 @@ exports.inviteMember = async (req, res, next) => {
     }
 };
 
-// Accept Invitation
 exports.acceptInvite = async (req, res, next) => {
     try {
         const project = await Project.findById(req.params.id);
         if (!project) return next(new ApiError('Project not found', 404));
 
-        // Find the member entry for the logged-in user
         const member = project.members.find(
             (m) => m.user.toString() === req.user._id.toString()
         );
@@ -194,7 +172,6 @@ exports.acceptInvite = async (req, res, next) => {
             return next(new ApiError('You are already an active member', 400));
         }
 
-        // Update Status
         member.status = 'Active';
         await project.save();
 
@@ -210,13 +187,11 @@ exports.acceptInvite = async (req, res, next) => {
     }
 };
 
-// Reject Invitation or Leave Project
 exports.rejectInvite = async (req, res, next) => {
     try {
         const project = await Project.findById(req.params.id);
         if (!project) return next(new ApiError('Project not found', 404));
 
-        // 1. Find the member first to check their status
         const memberIndex = project.members.findIndex(
             (m) => m.user.toString() === req.user._id.toString()
         );
@@ -225,17 +200,12 @@ exports.rejectInvite = async (req, res, next) => {
             return next(new ApiError('You are not a member of this project', 400));
         }
 
-        // 2. Determine the action message (Declined vs Left)
         const memberStatus = project.members[memberIndex].status;
-        const actionMessage = memberStatus === 'Pending'
-            ? 'Declined invitation'
-            : 'Left the workspace';
+        const actionMessage = memberStatus === 'Pending' ? 'Declined invitation' : 'Left the workspace';
 
-        // 3. Remove the member
         project.members.splice(memberIndex, 1);
         await project.save();
 
-        // 4. Log the Activity
         await Activity.create({
             project: project._id,
             user: req.user._id,
@@ -255,27 +225,22 @@ exports.removeMember = async (req, res, next) => {
         const project = await Project.findById(projectId);
         if (!project) return next(new ApiError('Project not found', 404));
 
-        // 1. Security Check: Only Owner can perform this action
         if (project.owner.toString() !== req.user._id.toString()) {
             return next(new ApiError('Not authorized. Only the project owner can remove members.', 403));
         }
 
-        // 2. Cannot remove yourself (owner)
         if (memberId === project.owner.toString()) {
             return next(new ApiError('Cannot remove the project owner.', 400));
         }
 
-        // 3. Find and remove the member
         const memberToRemove = project.members.find(m => m.user.toString() === memberId);
         if (!memberToRemove) {
             return next(new ApiError('Member not found in this project', 404));
         }
 
-        // Filter them out
         project.members = project.members.filter(m => m.user.toString() !== memberId);
         await project.save();
 
-        // 4. Log Activity
         const removedUserDoc = await User.findById(memberId);
         await Activity.create({
             project: project._id,
@@ -297,16 +262,12 @@ exports.deleteProject = async (req, res, next) => {
             return next(new ApiError('Project not found', 404));
         }
 
-        // 1. Security Check: Only Owner can delete
         if (project.owner.toString() !== req.user._id.toString()) {
             return next(new ApiError('Not authorized. Only the owner can delete this workspace.', 403));
         }
 
-        // 2. Cascade Delete: Remove all tasks and activities related to this project
         await Task.deleteMany({ project: project._id });
         await Activity.deleteMany({ project: project._id });
-
-        // 3. Delete the Project itself
         await project.deleteOne();
 
         res.status(200).json(new ApiResponse(null, 'Project and all associated data deleted successfully'));
@@ -319,14 +280,13 @@ exports.updateProject = async (req, res, next) => {
     try {
         const { title, description, aiApiKey } = req.body;
 
-        // Prepare strict update object
         const updateFields = {};
         if (title) updateFields.title = title;
         if (description !== undefined) updateFields.description = description;
         if (aiApiKey) updateFields.aiApiKey = encrypt(aiApiKey);
 
         const project = await Project.findOneAndUpdate(
-            { _id: req.params.id, owner: req.user._id }, // Inline security check
+            { _id: req.params.id, owner: req.user._id },
             { $set: updateFields },
             { new: true, runValidators: true }
         );
@@ -345,7 +305,6 @@ exports.updateIntegrations = async (req, res, next) => {
     try {
         const { geminiApiKey, githubToken, githubRepoPath } = req.body;
 
-        // Prepare strict update object
         const updateFields = {};
         if (geminiApiKey) updateFields['integrations.geminiApiKey'] = encrypt(geminiApiKey);
         if (githubToken) updateFields['integrations.githubToken'] = encrypt(githubToken);
@@ -377,7 +336,6 @@ exports.updateNotifications = async (req, res, next) => {
     try {
         const { slack, discord, notifyOnSubmit, notifyOnMerge } = req.body;
 
-        // Prepare strict update object
         const updateFields = {};
         if (slack !== undefined) updateFields['notifications.slack'] = slack;
         if (discord !== undefined) updateFields['notifications.discord'] = discord;
@@ -417,7 +375,6 @@ exports.getRecentProjects = async (req, res, next) => {
             return res.status(200).json(new ApiResponse([], 'No recent projects found'));
         }
 
-        // Filter out any projects that might have been deleted by the owner
         const validRecentProjects = user.recentProjects
             .filter(rp => rp.project != null)
             .map(rp => ({
@@ -436,9 +393,8 @@ exports.updateProjectWorkflow = async (req, res, next) => {
         const { projectId } = req.params;
         const { workflow } = req.body;
 
-        // Verify user is owner or admin (add your role check logic here)
         const project = await Project.findById(projectId);
-        if (!project) return res.status(404).json(new ApiResponse(null, 'Project not found', 404));
+        if (!project) return next(new ApiError('Project not found', 404));
 
         project.workflow = workflow;
         await project.save();
@@ -455,8 +411,8 @@ exports.getProjectAssets = async (req, res, next) => {
 
         // 1. Fetch all tasks in the project
         const tasks = await Task.find({ project: projectId })
-            .select('_id title attachments creator createdAt')
-            .populate('creator', 'name avatar');
+            .select('_id title attachments createdBy createdAt')
+            .populate('createdBy', 'name avatar');
 
         const taskIds = tasks.map(t => t._id);
 
@@ -465,8 +421,9 @@ exports.getProjectAssets = async (req, res, next) => {
             .populate('submittedBy', 'name avatar')
             .populate('task', 'title');
 
+        // FIXED: Changed 'author' to 'user' to match the Comment schema
         const comments = await Comment.find({ task: { $in: taskIds } })
-            .populate('author', 'name avatar')
+            .populate('user', 'name avatar')
             .populate('task', 'title');
 
         let assets = [];
@@ -496,7 +453,7 @@ exports.getProjectAssets = async (req, res, next) => {
                             source: 'Task Attachment',
                             sourceTitle: task.title,
                             taskId: task._id,
-                            uploadedBy: task.creator,
+                            uploadedBy: task.createdBy,
                             createdAt: task.createdAt
                         });
                     }
@@ -533,17 +490,20 @@ exports.getProjectAssets = async (req, res, next) => {
         comments.forEach(comment => {
             if (comment.attachments && Array.isArray(comment.attachments)) {
                 comment.attachments.forEach(att => {
-                    const url = typeof att === 'string' ? att : att.url;
+                    // Make sure we are reading the correct file properties from the Comment schema
+                    const url = att.fileUrl || (typeof att === 'string' ? att : null);
+                    const name = att.fileName || (url ? url.split('/').pop().split('?')[0] : 'Comment File');
+
                     if (url) {
                         assets.push({
                             _id: Math.random().toString(36).substr(2, 9),
-                            name: att.name || url.split('/').pop().split('?')[0] || 'Comment File',
+                            name: name,
                             url: url,
                             type: getFileType(url),
                             source: 'Comment',
                             sourceTitle: comment.task?.title || 'Task Thread',
                             taskId: comment.task?._id,
-                            uploadedBy: comment.author,
+                            uploadedBy: comment.user, // FIXED: Changed 'author' to 'user'
                             createdAt: comment.createdAt
                         });
                     }

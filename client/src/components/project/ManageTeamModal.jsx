@@ -1,16 +1,27 @@
 import { useState } from 'react';
-import { X, UserPlus, Shield, Trash2, Mail } from 'lucide-react';
+import { X, UserPlus, Shield, Trash2, Mail, Loader2 } from 'lucide-react'; // Added Loader2
 
 const ManageTeamModal = ({ isOpen, onClose, members, currentUser, isOwner, onRemoveMember, onInvite }) => {
     const [email, setEmail] = useState('');
     const [role, setRole] = useState('Contributor');
+    const [isInviting, setIsInviting] = useState(false); // --- NEW LOADING STATE ---
 
     if (!isOpen) return null;
 
     const handleInvite = async (e) => {
         e.preventDefault();
-        await onInvite(email, role);
-        setEmail('');
+        if (!email) return;
+
+        setIsInviting(true);
+        try {
+            await onInvite(email, role);
+        } catch (error) {
+            console.error("Invite failed");
+        } finally {
+            // 🔥 MOVED HERE: This ensures the input clears on BOTH success and failure
+            setEmail('');
+            setIsInviting(false);
+        }
     };
 
     return (
@@ -32,22 +43,36 @@ const ManageTeamModal = ({ isOpen, onClose, members, currentUser, isOwner, onRem
                         <input
                             type="email"
                             placeholder="User Email"
-                            className="flex-1 bg-[#0f172a] border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                            className="flex-1 bg-[#0f172a] border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-indigo-500 outline-none disabled:opacity-50"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
+                            disabled={isInviting} // Disable while inviting
                             required
                         />
                         <select
                             value={role}
                             onChange={(e) => setRole(e.target.value)}
-                            className="bg-[#0f172a] border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-indigo-500 outline-none"
+                            disabled={isInviting} // Disable while inviting
+                            className="bg-[#0f172a] border border-gray-600 rounded-lg px-2 py-2 text-sm text-white focus:border-indigo-500 outline-none disabled:opacity-50"
                         >
                             <option value="Contributor">Contributor</option>
                             <option value="Viewer">Viewer</option>
                             <option value="Co-Owner">Co-Owner</option>
                         </select>
-                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
-                            Invite
+                        <button
+                            type="submit"
+                            disabled={isInviting}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center min-w-[100px] gap-2"
+                        >
+                            {/* --- CONDITIONAL RENDER FOR BUTTON TEXT --- */}
+                            {isInviting ? (
+                                <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    Inviting
+                                </>
+                            ) : (
+                                'Invite'
+                            )}
                         </button>
                     </form>
                 </div>
@@ -57,7 +82,6 @@ const ManageTeamModal = ({ isOpen, onClose, members, currentUser, isOwner, onRem
                     {members.map((member) => (
                         <div key={member.user._id} className="flex items-center justify-between bg-[#0f172a]/40 p-3 rounded-xl border border-gray-800">
                             <div className="flex items-center gap-3 min-w-0">
-                                {/* FIXED: Avatar logic - Strictly first letter */}
                                 <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-sm shrink-0">
                                     {member.user.name?.charAt(0).toUpperCase()}
                                 </div>

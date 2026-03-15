@@ -1,6 +1,9 @@
 const { ApiError } = require('../utils/apiResponse');
 
 exports.errorHandler = (err, req, res, next) => {
+    // 🔴 ADD THIS LINE RIGHT HERE:
+    console.error("🔥 BACKEND ERROR CAUGHT:", err);
+
     let error = { ...err };
     error.message = err.message;
 
@@ -30,4 +33,3 @@ exports.errorHandler = (err, req, res, next) => {
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
 };
-

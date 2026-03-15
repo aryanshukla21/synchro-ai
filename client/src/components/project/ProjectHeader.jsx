@@ -4,7 +4,7 @@ import {
     Plus, MoreVertical, ChevronRight,
     Settings, X, Save, Loader2,
     Download, FileText, Table, ClipboardCheck,
-    FolderOpen
+    FolderOpen, Bug
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';

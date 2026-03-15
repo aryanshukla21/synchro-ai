@@ -159,7 +159,7 @@ exports.updateTask = async (req, res, next) => {
     }
 };
 
-// 3. Respond to Assignment (Accept/Decline) -> Notify Admin + Email
+// 3. Respond to Assignment (Modified to move to To-Do)
 exports.respondToTaskAssignment = async (req, res, next) => {
     try {
         const { response } = req.body;
@@ -177,50 +177,43 @@ exports.respondToTaskAssignment = async (req, res, next) => {
         }
 
         task.assignmentStatus = action === 'Accept' ? 'Accepted' : 'Declined';
+
+        // 🔥 AUTOMATION: If accepted, move to To-Do status automatically
+        if (action === 'Accept') {
+            task.status = 'To-Do';
+        }
+
         await task.save();
 
-        // NOTIFICATION: Notify Owner (Admin)
-        await notificationService.notifyTaskResponse(
-            task.createdBy._id,
-            req.user._id,
-            task.title,
-            action
-        );
-
+        // NOTIFICATIONS & ACTIVITY (Existing logic stays same)
+        await notificationService.notifyTaskResponse(task.createdBy._id, req.user._id, task.title, action);
         await Activity.create({
             project: task.project,
             user: req.user._id,
             action: `${action}ed task assignment: "${task.title}"`
         });
 
-        // EMAIL: Notify Owner
-        await sendEmail({
-            email: task.createdBy.email,
-            subject: `Task ${action}ed: ${task.title}`,
-            message: `The user ${req.user.name} has ${action.toLowerCase()}ed the task assignment for "${task.title}".`
-        });
+        const populatedTask = await Task.findById(task._id).populate('assignedTo', 'name avatar').populate('createdBy', 'name');
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', populatedTask);
 
-        task = await Task.findById(task._id)
-            .populate('assignedTo', 'name email avatar')
-            .populate('createdBy', 'name');
-
-        // Emit real-time update
-        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
-
-        res.status(200).json(new ApiResponse(task, `Task assignment ${action}ed`));
+        res.status(200).json(new ApiResponse(populatedTask, `Task assignment ${action}ed`));
     } catch (error) {
         next(error);
     }
 };
 
-// 4. Update Task Status (To-Do -> In-Progress) -> Notify Owner
+// 4. Update Task Status (Strict automation logic)
 exports.updateTaskStatus = async (req, res, next) => {
     try {
         const { status } = req.body;
-        // Removed hardcoded validStatuses check here since we support dynamic columns now
-
         let task = await Task.findById(req.params.id);
         if (!task) return next(new ApiError('Task not found', 404));
+
+        // SECURITY: If not owner, prevent manual status jumps to "Merged"
+        const isOwner = task.createdBy.toString() === req.user._id.toString();
+        if (!isOwner && status === 'Merged') {
+            return next(new ApiError('Only project owner can merge tasks', 403));
+        }
 
         const oldStatus = task.status;
         task.status = status;
@@ -236,9 +229,7 @@ exports.updateTaskStatus = async (req, res, next) => {
             });
         }
 
-        task = await Task.findById(task._id)
-            .populate('assignedTo', 'name email avatar')
-            .populate('createdBy', 'name');
+        const populatedTask = await Task.findById(task._id).populate('assignedTo', 'name email avatar').populate('createdBy', 'name');
 
         await Activity.create({
             project: task.project,
@@ -246,10 +237,8 @@ exports.updateTaskStatus = async (req, res, next) => {
             action: `Moved "${task.title}" to ${status}`
         });
 
-        // Emit real-time status change to trigger drag-and-drop visuals for others
-        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', task);
-
-        res.status(200).json(new ApiResponse(task, `Task status updated to ${status}`));
+        socketHelper.emitToProjectRoom(task.project, 'taskUpdated', populatedTask);
+        res.status(200).json(new ApiResponse(populatedTask, `Task status updated to ${status}`));
     } catch (error) {
         next(error);
     }

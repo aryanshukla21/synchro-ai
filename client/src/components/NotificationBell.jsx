@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Bell, CheckCircle2, Circle, Check } from 'lucide-react';
-import api from '../api/axios'; // Adjusted path
-import { useSocket } from '../contexts/SocketContext'; // Adjusted path
+import api from '../api/axios';
+import { useSocket } from '../contexts/SocketContext';
+import { useToast } from '../contexts/ToastContext'; // --- ADDED TOAST ---
 
 const NotificationBell = () => {
     const { socket } = useSocket();
+    const { showToast } = useToast(); // --- ADDED TOAST ---
     const [notifications, setNotifications] = useState([]);
     const [isOpen, setIsOpen] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -35,11 +37,12 @@ const NotificationBell = () => {
         const handleNewNotification = (newNotif) => {
             setNotifications(prev => [
                 {
-                    _id: Date.now().toString(), // Temp ID until next refresh if not provided
+                    // FIX: Use the real DB _id if the backend sends it, otherwise fallback
+                    _id: newNotif._id || Date.now().toString(),
                     message: newNotif.message,
                     type: newNotif.type,
                     isRead: false,
-                    createdAt: new Date().toISOString()
+                    createdAt: newNotif.createdAt || new Date().toISOString()
                 },
                 ...prev
             ]);
@@ -67,16 +70,24 @@ const NotificationBell = () => {
 
     // 4. Mark single notification as read
     const markAsRead = async (id, e) => {
-        e.stopPropagation();
+        if (e) e.stopPropagation();
+
+        // Prevent backend crash if we try to update a notification with a fake Socket timestamp ID
+        if (!id || id.length < 10) return;
+
         try {
             // Optimistic UI update
             setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: true } : n));
             setUnreadCount(prev => Math.max(0, prev - 1));
 
-            // Backend API call
-            await api.put(`/notifications/${id}/read`);
+            // 🔥 CHANGED FROM api.put TO api.patch 🔥
+            await api.patch(`/notifications/${id}/read`);
         } catch (error) {
-            console.error("Failed to mark as read", error);
+            showToast(error.response?.data?.message || "Failed to mark as read", "error");
+
+            // Revert optimistic update on failure
+            setNotifications(prev => prev.map(n => n._id === id ? { ...n, isRead: false } : n));
+            setUnreadCount(prev => prev + 1);
         }
     };
 
@@ -85,9 +96,11 @@ const NotificationBell = () => {
         try {
             setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
             setUnreadCount(0);
-            await api.put('/notifications/read-all');
+
+            // 🔥 CHANGED FROM api.put TO api.patch 🔥
+            await api.patch('/notifications/read-all');
         } catch (error) {
-            console.error("Failed to mark all as read", error);
+            showToast(error.response?.data?.message || "Failed to mark all as read", "error");
         }
     };
 
@@ -132,7 +145,9 @@ const NotificationBell = () => {
                                 {notifications.map((notif) => (
                                     <div
                                         key={notif._id}
-                                        className={`p-4 flex gap-3 transition hover:bg-gray-800/50 ${!notif.isRead ? 'bg-indigo-900/10' : ''}`}
+                                        // FIX: Made the entire notification body clickable!
+                                        onClick={(e) => !notif.isRead && markAsRead(notif._id, e)}
+                                        className={`p-4 flex gap-3 transition cursor-pointer hover:bg-gray-800/50 ${!notif.isRead ? 'bg-indigo-900/10' : ''}`}
                                     >
                                         <div className="mt-0.5">
                                             {!notif.isRead ? (

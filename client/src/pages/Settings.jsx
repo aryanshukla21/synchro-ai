@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { Users, Link as LinkIcon, Bell, ShieldAlert, GitMerge, Loader2 } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Users, Link as LinkIcon, Bell, ShieldAlert, GitMerge, Loader2, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../hooks/useAuth';
 
 // Tabs
 import MembersTab from '../components/settings/MembersTab';
@@ -10,13 +11,22 @@ import IntegrationsTab from '../components/settings/IntegrationsTab';
 import NotificationsTab from '../components/settings/NotificationsTab';
 import WorkflowTab from '../components/settings/WorkflowTab';
 
+// Modals
+import DeleteConfirmationModal from '../components/project/DeleteConfirmationModal';
+
 const Settings = () => {
     const { projectId } = useParams();
+    const navigate = useNavigate();
     const { showToast } = useToast();
+    const { user } = useAuth(); // Needed to verify if user is the Owner
 
     const [activeTab, setActiveTab] = useState('members');
     const [project, setProject] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    // Delete Modal State
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Fetch the project data so the WorkflowTab has the rules it needs to render
     useEffect(() => {
@@ -32,6 +42,21 @@ const Settings = () => {
         };
         if (projectId) fetchProject();
     }, [projectId]);
+
+    // Handle Project Deletion
+    const handleDeleteProject = async () => {
+        setIsDeleting(true);
+        try {
+            await api.delete(`/projects/${projectId}`);
+            showToast("Workspace deleted successfully", "success");
+            setIsDeleteModalOpen(false);
+            navigate('/dashboard'); // Redirect to dashboard after deletion
+        } catch (error) {
+            showToast(error.response?.data?.message || "Failed to delete workspace", "error");
+            setIsDeleting(false);
+            setIsDeleteModalOpen(false);
+        }
+    };
 
     // Render the correct component based on state
     const renderActiveTab = () => {
@@ -55,6 +80,9 @@ const Settings = () => {
         );
     }
 
+    // Determine if the current user is the owner of the project
+    const isOwner = project && (typeof project.owner === 'object' ? project.owner._id === user?._id : project.owner === user?._id);
+
     return (
         <div className="flex-1 flex flex-col h-full bg-[#0f172a] text-gray-300 font-sans p-6 md:p-10 overflow-y-auto">
             <div className="max-w-5xl mx-auto w-full">
@@ -68,31 +96,46 @@ const Settings = () => {
 
                 <div className="flex flex-col md:flex-row gap-8">
                     {/* Settings Sidebar Tabs */}
-                    <div className="w-full md:w-64 shrink-0 space-y-2">
-                        <TabButton
-                            active={activeTab === 'members'}
-                            onClick={() => setActiveTab('members')}
-                            icon={<Users size={18} />}
-                            label="Members & Roles"
-                        />
-                        <TabButton
-                            active={activeTab === 'workflow'}
-                            onClick={() => setActiveTab('workflow')}
-                            icon={<GitMerge size={18} />}
-                            label="Workflow & Rules"
-                        />
-                        <TabButton
-                            active={activeTab === 'integrations'}
-                            onClick={() => setActiveTab('integrations')}
-                            icon={<LinkIcon size={18} />}
-                            label="Integrations & APIs"
-                        />
-                        <TabButton
-                            active={activeTab === 'notifications'}
-                            onClick={() => setActiveTab('notifications')}
-                            icon={<Bell size={18} />}
-                            label="Global Notifications"
-                        />
+                    <div className="w-full md:w-64 shrink-0 space-y-2 flex flex-col justify-between">
+                        <div className="space-y-2">
+                            <TabButton
+                                active={activeTab === 'members'}
+                                onClick={() => setActiveTab('members')}
+                                icon={<Users size={18} />}
+                                label="Members & Roles"
+                            />
+                            <TabButton
+                                active={activeTab === 'workflow'}
+                                onClick={() => setActiveTab('workflow')}
+                                icon={<GitMerge size={18} />}
+                                label="Workflow & Rules"
+                            />
+                            <TabButton
+                                active={activeTab === 'integrations'}
+                                onClick={() => setActiveTab('integrations')}
+                                icon={<LinkIcon size={18} />}
+                                label="Integrations & APIs"
+                            />
+                            <TabButton
+                                active={activeTab === 'notifications'}
+                                onClick={() => setActiveTab('notifications')}
+                                icon={<Bell size={18} />}
+                                label="Global Notifications"
+                            />
+                        </div>
+
+                        {/* Danger Zone - Only visible to the Owner */}
+                        {isOwner && (
+                            <div className="pt-8 mt-8 border-t border-gray-800">
+                                <button
+                                    onClick={() => setIsDeleteModalOpen(true)}
+                                    className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl transition font-bold text-sm bg-red-500/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-500/20 hover:border-red-500 shadow-lg shadow-red-900/20"
+                                >
+                                    <Trash2 size={18} />
+                                    Delete Workspace
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Content Area */}
@@ -101,6 +144,15 @@ const Settings = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Mount the Delete Modal */}
+            <DeleteConfirmationModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => !isDeleting && setIsDeleteModalOpen(false)}
+                onConfirm={handleDeleteProject}
+                isDeleting={isDeleting}
+                projectTitle={project?.title || project?.name || "this workspace"}
+            />
         </div>
     );
 };

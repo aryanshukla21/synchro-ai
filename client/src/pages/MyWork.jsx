@@ -112,7 +112,7 @@ const MyWork = () => {
                         onClick={() => setFilter('Active')}
                         className={`px-4 py-1.5 text-sm font-bold rounded-md transition ${filter === 'Active' ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
                     >
-                        Active ({totalActiveCount})
+                        Active ({filter === 'Active' ? totalActiveCount : tasks.filter(t => t.status !== 'Merged' && t.status !== 'Completed').length})
                     </button>
                     <button
                         onClick={() => setFilter('All')}
@@ -171,7 +171,7 @@ const MyWork = () => {
                     />
                 )}
 
-                {/* EMPTY STATE */}
+                {/* EMPTY STATE - ACTIVE FILTER */}
                 {totalActiveCount === 0 && filter === 'Active' && (
                     <div className="flex flex-col items-center justify-center py-20 bg-[#1e293b]/50 border border-gray-700 rounded-xl text-center shadow-inner">
                         <CheckCircle2 size={48} className="text-emerald-500 mb-4 opacity-50" />
@@ -179,6 +179,15 @@ const MyWork = () => {
                         <p className="text-gray-400 text-sm max-w-sm">
                             You have no active or pending tasks assigned to you across any of your workspaces. Take a breather.
                         </p>
+                    </div>
+                )}
+
+                {/* EMPTY STATE - ALL TASKS FILTER */}
+                {totalActiveCount === 0 && filter === 'All' && (
+                    <div className="flex flex-col items-center justify-center py-20 text-center bg-[#0f172a]/30 rounded-xl border border-gray-800/50 mt-6">
+                        <div className="text-gray-600 mb-3 text-5xl">📋</div>
+                        <h3 className="text-lg font-semibold text-gray-300">No tasks available</h3>
+                        <p className="text-sm text-gray-500 mt-1">You haven't been assigned any tasks yet.</p>
                     </div>
                 )}
             </main>

@@ -13,7 +13,7 @@ const validateEnv = () => {
         'SMTP_USER',
         'SMTP_PASS',
         'GEMINI_API_KEY',
-        'ENCRYPTION_KEY' // Ensures encryption utility won't crash
+        'ENCRYPTION_KEY'
     ];
 
     const missingVars = requiredVars.filter((key) => !process.env[key]);
@@ -107,6 +107,19 @@ app.use(cors({
 
 // Body parser, reading data from body into req.body
 app.use(express.json({ limit: '10mb' }));
+
+// ==========================================
+// 🔥 EXPRESS 5.x QUERY FIX ADDED HERE
+// ==========================================
+app.use((req, res, next) => {
+    Object.defineProperty(req, 'query', {
+        value: { ...req.query },
+        writable: true,
+        configurable: true,
+        enumerable: true,
+    });
+    next();
+});
 
 // Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
