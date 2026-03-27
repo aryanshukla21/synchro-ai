@@ -1,49 +1,57 @@
+import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 
-// Pages
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import ProjectDetails from './pages/ProjectDetails';
-import Kanban from './pages/Kanban';
-import NotFound from './pages/NotFound';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import MyProjects from './pages/MyProjects';
-import MyProfile from './pages/MyProfile';
-import TaskWorkPage from './pages/TaskWorkPage';
-import SetupPassword from './pages/SetupPassword';
-import ProjectReviews from './pages/ProjectReviews';
-import Settings from './pages/Settings';
-import JoinWorkspace from './pages/JoinWorkspace';
-import ProjectAuditLog from './pages/ProjectAuditLog';
-import GlobalSearch from './pages/GlobalSearch';
-import Analytics from './pages/Analytics';
-import ResourcePlanning from './pages/ResourcePlanning';
-import MyWork from './pages/MyWork';
-import ProjectAssets from './pages/ProjectAssets';
-import Timesheet from './pages/Timesheet';
-import IssuesTracker from './pages/IssuesTracker';
-
-// Components & Contexts
+// Components & Contexts (Keep these static for immediate app initialization)
 import Layout from './components/Layout';
 import { ToastProvider } from './contexts/ToastContext';
 import { SocketProvider } from './contexts/SocketContext';
 import GlobalNotificationListener from './components/GlobalNotificationListener';
 
+// 🚀 LAZY LOADED PAGES (Code Splitting)
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
+const Kanban = lazy(() => import('./pages/Kanban'));
+const NotFound = lazy(() => import('./pages/NotFound'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const MyProjects = lazy(() => import('./pages/MyProjects'));
+const MyProfile = lazy(() => import('./pages/MyProfile'));
+const TaskWorkPage = lazy(() => import('./pages/TaskWorkPage'));
+const SetupPassword = lazy(() => import('./pages/SetupPassword'));
+const ProjectReviews = lazy(() => import('./pages/ProjectReviews'));
+const Settings = lazy(() => import('./pages/Settings'));
+const JoinWorkspace = lazy(() => import('./pages/JoinWorkspace'));
+const ProjectAuditLog = lazy(() => import('./pages/ProjectAuditLog'));
+const GlobalSearch = lazy(() => import('./pages/GlobalSearch'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const ResourcePlanning = lazy(() => import('./pages/ResourcePlanning'));
+const MyWork = lazy(() => import('./pages/MyWork'));
+const ProjectAssets = lazy(() => import('./pages/ProjectAssets'));
+const Timesheet = lazy(() => import('./pages/Timesheet'));
+const IssuesTracker = lazy(() => import('./pages/IssuesTracker'));
+
+// ⏳ Global Fallback Loader (Shows while downloading the requested page chunk)
+const PageLoader = () => (
+  <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
+    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500"></div>
+  </div>
+);
+
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-4 text-white flex justify-center items-center min-h-screen">Loading...</div>;
+  if (loading) return <PageLoader />;
   return user ? children : <Navigate to="/login" />;
 };
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  if (loading) return <div className="p-4 text-white flex justify-center items-center min-h-screen">Loading...</div>;
+  if (loading) return <PageLoader />;
   // If user exists, send them to dashboard
-  return user ? <Navigate to="/" replace /> : children;
+  return user ? <Navigate to="/dashboard" replace /> : children;
 };
 
 const IndexRoute = () => {
@@ -65,51 +73,55 @@ function App() {
         <GlobalNotificationListener />
 
         <div className="min-h-screen bg-[#0f172a] text-gray-300 font-sans">
-          <Routes>
-            <Route path="/" element={<IndexRoute />} />
-            {/* Public Routes */}
-            <Route path="/login" element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            } />
+          {/* 🛡️ WRAP ROUTES IN SUSPENSE */}
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              <Route path="/" element={<IndexRoute />} />
 
-            <Route path="/register" element={
-              <PublicRoute>
-                <Register />
-              </PublicRoute>
-            } />
+              {/* Public Routes */}
+              <Route path="/login" element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              } />
 
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password/:token" element={<ResetPassword />} />
+              <Route path="/register" element={
+                <PublicRoute>
+                  <Register />
+                </PublicRoute>
+              } />
 
-            {/* Universal Route (Accessible to both logged-in and logged-out users) */}
-            <Route path="/join-workspace/:token" element={<JoinWorkspace />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password/:token" element={<ResetPassword />} />
 
-            {/* Protected Routes */}
-            <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/workload" element={<ResourcePlanning />} />
-              <Route path="/my-work" element={<MyWork />} />
-              <Route path="/search" element={<GlobalSearch />} />
-              <Route path="/my-projects" element={<MyProjects />} />
-              <Route path="/kanban" element={<Kanban />} />
-              <Route path="/project/:id" element={<ProjectDetails />} />
-              <Route path="/project/:projectId/reviews" element={<ProjectReviews />} />
-              <Route path="/project/:projectId/audit-log" element={<ProjectAuditLog />} />
-              <Route path="/profile" element={<MyProfile />} />
-              <Route path="/task/:id/work" element={<TaskWorkPage />} />
-              <Route path="/project/:projectId/settings" element={<Settings />} />
-              <Route path="/setup-password" element={<SetupPassword />} />
-              <Route path="/project/:projectId/assets" element={<ProjectAssets />} />
-              <Route path="/timesheet" element={<Timesheet />} />
-              <Route path="/project/:projectId/issues" element={<IssuesTracker />} />
-            </Route>
+              {/* Universal Route (Accessible to both logged-in and logged-out users) */}
+              <Route path="/join-workspace/:token" element={<JoinWorkspace />} />
 
-            {/* Catch-all Route for 404 - MUST BE LAST */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+              {/* Protected Routes */}
+              <Route element={<PrivateRoute><Layout /></PrivateRoute>}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/workload" element={<ResourcePlanning />} />
+                <Route path="/my-work" element={<MyWork />} />
+                <Route path="/search" element={<GlobalSearch />} />
+                <Route path="/my-projects" element={<MyProjects />} />
+                <Route path="/kanban" element={<Kanban />} />
+                <Route path="/project/:id" element={<ProjectDetails />} />
+                <Route path="/project/:projectId/reviews" element={<ProjectReviews />} />
+                <Route path="/project/:projectId/audit-log" element={<ProjectAuditLog />} />
+                <Route path="/profile" element={<MyProfile />} />
+                <Route path="/task/:id/work" element={<TaskWorkPage />} />
+                <Route path="/project/:projectId/settings" element={<Settings />} />
+                <Route path="/setup-password" element={<SetupPassword />} />
+                <Route path="/project/:projectId/assets" element={<ProjectAssets />} />
+                <Route path="/timesheet" element={<Timesheet />} />
+                <Route path="/project/:projectId/issues" element={<IssuesTracker />} />
+              </Route>
+
+              {/* Catch-all Route for 404 - MUST BE LAST */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </div>
 
       </SocketProvider>

@@ -1,11 +1,13 @@
+// client/src/api/axios.js
 import axios from 'axios';
 
 // Create an axios instance with your backend URL
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api', // Added VITE env support
+    baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
     headers: {
         'Content-Type': 'application/json',
     },
+    // withCredentials: true, // Uncomment this if you later switch to storing tokens in HTTP-only cookies
 });
 
 // Request Interceptor: Attaches the Token to every request
@@ -61,9 +63,7 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 // If the refresh token itself is expired or invalid, boot the user out
                 console.error('Refresh token expired or invalid, forcing logout.');
-                localStorage.removeItem('token');
-                localStorage.removeItem('refreshToken');
-                localStorage.removeItem('user');
+                localStorage.clear(); // Clears all auth data at once
                 window.location.href = '/login';
                 return Promise.reject(refreshError);
             }

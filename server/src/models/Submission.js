@@ -22,7 +22,7 @@ const submissionSchema = new mongoose.Schema({
         score: Number,             // Suggested quality score
         passedAI: Boolean          // Automated pass/fail based on project rules
     },
-    // --- NEW: Added to store the automated GitHub Pull Request link ---
+    // --- Added to store the automated GitHub Pull Request link ---
     githubPrUrl: {
         type: String,
         default: null

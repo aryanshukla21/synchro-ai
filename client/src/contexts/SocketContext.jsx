@@ -1,3 +1,4 @@
+// client/src/contexts/SocketContext.jsx
 import { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../hooks/useAuth'; // Adjust path if necessary
@@ -20,7 +21,7 @@ export const SocketProvider = ({ children }) => {
         }
 
         // Replace with your actual backend URL or env variable
-        const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+        const backendUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
         // 2. Initialize the Socket Connection
         const socketInstance = io(backendUrl, {
@@ -46,6 +47,7 @@ export const SocketProvider = ({ children }) => {
             socketInstance.off('connect');
             socketInstance.off('connect_error');
             socketInstance.disconnect();
+            console.log('🔌 Disconnected from WebSocket server');
         };
     }, [user]); // Re-run strictly when the user logs in or out
 
