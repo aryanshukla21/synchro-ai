@@ -59,6 +59,7 @@ const commentRoutes = require('./routes/comments');
 const workspaceRoutes = require('./routes/workspace');
 const searchRoutes = require('./routes/search');
 const timeLogRoutes = require('./routes/timelogs');
+const contactRoutes = require('./routes/contact');
 
 // Import Services
 const notificationService = require('./services/notificationServices');
@@ -147,6 +148,7 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/workspace', workspaceRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/timelogs', timeLogRoutes);
+app.use('/api/contact', contactRoutes);
 
 // 5. Global Error Handling Middleware
 app.use(errorHandler);

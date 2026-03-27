@@ -8,7 +8,7 @@ const aiService = require('../services/aiServices');
 
 // --- INTEGRATION SERVICES ---
 const { emitToProjectRoom, emitToUser } = require('../config/socket');
-const { sendWebhookNotification } = require('../services/webhookServices');
+const { sendWebhookNotification } = require('../services/webHookServices');
 const { createPullRequest } = require('../services/githubServices');
 const notificationService = require('../services/notificationServices');
 const { ApiResponse, ApiError } = require('../utils/apiResponse');

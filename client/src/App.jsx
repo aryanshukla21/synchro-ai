@@ -2,13 +2,13 @@ import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 
-// Components & Contexts (Keep these static for immediate app initialization)
+// Components & Contexts
 import Layout from './components/Layout';
 import { ToastProvider } from './contexts/ToastContext';
 import { SocketProvider } from './contexts/SocketContext';
 import GlobalNotificationListener from './components/GlobalNotificationListener';
 
-// 🚀 LAZY LOADED PAGES (Code Splitting)
+// 🚀 LAZY LOADED PAGES
 const Home = lazy(() => import('./pages/Home'));
 const Login = lazy(() => import('./pages/Login'));
 const Register = lazy(() => import('./pages/Register'));
@@ -34,10 +34,17 @@ const ProjectAssets = lazy(() => import('./pages/ProjectAssets'));
 const Timesheet = lazy(() => import('./pages/Timesheet'));
 const IssuesTracker = lazy(() => import('./pages/IssuesTracker'));
 
-// ⏳ Global Fallback Loader (Shows while downloading the requested page chunk)
+// 🆕 NEW INFORMATIONAL PAGES
+const Help = lazy(() => import('./pages/Help'));
+const Docs = lazy(() => import('./pages/Docs'));
+const Privacy = lazy(() => import('./pages/Privacy'));
+const Terms = lazy(() => import('./pages/Terms'));
+const Contact = lazy(() => import('./pages/Contact'));
+
+// ⏳ Global Fallback Loader
 const PageLoader = () => (
   <div className="flex min-h-screen items-center justify-center bg-[#0f172a]">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-blue-500"></div>
+    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-500"></div>
   </div>
 );
 
@@ -50,51 +57,39 @@ const PrivateRoute = ({ children }) => {
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
-  // If user exists, send them to dashboard
   return user ? <Navigate to="/dashboard" replace /> : children;
 };
 
 const IndexRoute = () => {
-  const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-[#0f172a]" />; // Smooth blank screen while checking auth
-  // If logged in -> Go to Dashboard. If logged out -> Show Landing Page.
-  return user ? <Navigate to="/dashboard" replace /> : <Home />;
+  const { loading } = useAuth();
+  if (loading) return <div className="min-h-screen bg-[#0f172a]" />;
+  // Render Home directly so logged-in users can see the updated Home UI
+  return <Home />;
 };
 
 function App() {
   return (
     <ToastProvider>
-      {/* Wrap the app in SocketProvider so the connection is available everywhere.
-        It sits inside ToastProvider so socket listeners can trigger toasts.
-      */}
       <SocketProvider>
-
-        {/* The invisible watcher that catches global server events and fires popups */}
         <GlobalNotificationListener />
 
         <div className="min-h-screen bg-[#0f172a] text-gray-300 font-sans">
-          {/* 🛡️ WRAP ROUTES IN SUSPENSE */}
           <Suspense fallback={<PageLoader />}>
             <Routes>
               <Route path="/" element={<IndexRoute />} />
 
+              {/* Informational Pages */}
+              <Route path="/help" element={<Help />} />
+              <Route path="/docs" element={<Docs />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/contact" element={<Contact />} />
+
               {/* Public Routes */}
-              <Route path="/login" element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              } />
-
-              <Route path="/register" element={
-                <PublicRoute>
-                  <Register />
-                </PublicRoute>
-              } />
-
+              <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
-
-              {/* Universal Route (Accessible to both logged-in and logged-out users) */}
               <Route path="/join-workspace/:token" element={<JoinWorkspace />} />
 
               {/* Protected Routes */}
@@ -118,12 +113,10 @@ function App() {
                 <Route path="/project/:projectId/issues" element={<IssuesTracker />} />
               </Route>
 
-              {/* Catch-all Route for 404 - MUST BE LAST */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
         </div>
-
       </SocketProvider>
     </ToastProvider>
   );
