@@ -137,6 +137,15 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- KEEP-AWAKE PING ROUTE ---
+// This route is used by uptime monitors to prevent Render from sleeping.
+app.get('/api/ping', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'Server is awake and active!'
+    });
+});
+
 // 4. Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
