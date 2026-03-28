@@ -15,6 +15,7 @@ const Register = lazy(() => import('./pages/Register'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ProjectDetails = lazy(() => import('./pages/ProjectDetails'));
 const Kanban = lazy(() => import('./pages/Kanban'));
+const ProjectCalendar = lazy(() => import('./pages/ProjectCalendar'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
@@ -34,7 +35,7 @@ const ProjectAssets = lazy(() => import('./pages/ProjectAssets'));
 const Timesheet = lazy(() => import('./pages/Timesheet'));
 const IssuesTracker = lazy(() => import('./pages/IssuesTracker'));
 
-// 🆕 NEW INFORMATIONAL PAGES
+// 🆕 INFORMATIONAL PAGES
 const Help = lazy(() => import('./pages/Help'));
 const Docs = lazy(() => import('./pages/Docs'));
 const Privacy = lazy(() => import('./pages/Privacy'));
@@ -63,7 +64,6 @@ const PublicRoute = ({ children }) => {
 const IndexRoute = () => {
   const { loading } = useAuth();
   if (loading) return <div className="min-h-screen bg-[#0f172a]" />;
-  // Render Home directly so logged-in users can see the updated Home UI
   return <Home />;
 };
 
@@ -102,6 +102,7 @@ function App() {
                 <Route path="/my-projects" element={<MyProjects />} />
                 <Route path="/kanban" element={<Kanban />} />
                 <Route path="/project/:id" element={<ProjectDetails />} />
+                <Route path="/project/:projectId/calendar" element={<ProjectCalendar />} />
                 <Route path="/project/:projectId/reviews" element={<ProjectReviews />} />
                 <Route path="/project/:projectId/audit-log" element={<ProjectAuditLog />} />
                 <Route path="/profile" element={<MyProfile />} />

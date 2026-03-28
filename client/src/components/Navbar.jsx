@@ -37,15 +37,15 @@ const Navbar = () => {
 
     return (
         <nav className="bg-[#1e293b] border-b border-gray-700 sticky top-0 z-50 shadow-md">
-            {/* Centered layout maintained */}
-            <div className="container mx-auto flex justify-center items-center gap-6 sm:gap-12 px-6 py-3">
+            {/* Adjusted gaps and padding for mobile compatibility */}
+            <div className="container mx-auto flex justify-between sm:justify-center items-center gap-3 sm:gap-8 lg:gap-12 px-4 sm:px-6 py-3">
 
                 {/* Logo Section */}
                 <Link to="/" className="flex items-center gap-3 text-white font-bold text-xl hover:opacity-90 transition shrink-0">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
                         S
                     </div>
-                    <span className="tracking-tight hidden lg:block">Synchro-AI</span>
+                    <span className="tracking-tight hidden md:block">Synchro-AI</span>
                 </Link>
 
                 {/* Global Search Bar */}
@@ -57,10 +57,10 @@ const Navbar = () => {
                         placeholder="Search projects, tasks, or people..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-[#0f172a] border border-gray-600 rounded-full py-2 pl-10 pr-14 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-gray-500"
+                        className="w-full bg-[#0f172a] border border-gray-600 rounded-full py-2 pl-10 pr-10 sm:pr-14 text-sm text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder-gray-500"
                     />
-                    {/* Visual Shortcut Hint (Hides when typing/focused) */}
-                    <div className="absolute right-3 top-2 flex items-center pointer-events-none opacity-50 group-focus-within:opacity-0 transition-opacity">
+                    {/* Visual Shortcut Hint (Hides on mobile / when typing / focused) */}
+                    <div className="absolute right-3 top-2 hidden sm:flex items-center pointer-events-none opacity-50 group-focus-within:opacity-0 transition-opacity">
                         <span className="text-[10px] font-semibold bg-[#1e293b] text-gray-400 py-1 px-1.5 rounded border border-gray-600">
                             ⌘K
                         </span>
@@ -68,12 +68,12 @@ const Navbar = () => {
                 </form>
 
                 {/* Actions & Profile Section */}
-                <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+                <div className="flex items-center gap-3 sm:gap-6 shrink-0">
                     <NotificationBell />
 
                     {/* User Profile Info */}
-                    <div className="flex items-center gap-3 pl-4 sm:pl-6 border-l border-gray-700 transition-all">
-                        <div className="text-right hidden md:block">
+                    <div className="flex items-center gap-3 pl-3 sm:pl-6 border-l border-gray-700 transition-all">
+                        <div className="text-right hidden lg:block">
                             <p className="text-sm font-medium text-white leading-tight">{user.name}</p>
                             <p className="text-[11px] text-emerald-400 mt-0.5 font-medium">Active</p>
                         </div>
@@ -82,10 +82,10 @@ const Navbar = () => {
                             <img
                                 src={user.avatar}
                                 alt={`${user.name}'s Avatar`}
-                                className="w-9 h-9 rounded-full object-cover shadow-md ring-2 ring-[#0f172a] hover:ring-indigo-500 transition-all cursor-pointer"
+                                className="w-8 h-8 sm:w-9 sm:h-9 rounded-full object-cover shadow-md ring-2 ring-[#0f172a] hover:ring-indigo-500 transition-all cursor-pointer"
                             />
                         ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-[#0f172a] hover:ring-indigo-400 transition-all cursor-pointer">
+                            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-[#0f172a] hover:ring-indigo-400 transition-all cursor-pointer">
                                 {user.name?.charAt(0).toUpperCase() || 'U'}
                             </div>
                         )}
@@ -93,7 +93,7 @@ const Navbar = () => {
 
                     <button
                         onClick={logout}
-                        className="text-gray-400 hover:text-red-400 transition p-2 rounded-full hover:bg-gray-800 ml-2"
+                        className="text-gray-400 hover:text-red-400 transition p-1.5 sm:p-2 rounded-full hover:bg-gray-800 hidden sm:block ml-0 sm:ml-2"
                         title="Logout"
                     >
                         <LogOut size={18} />

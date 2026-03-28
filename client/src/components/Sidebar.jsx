@@ -15,6 +15,13 @@ const Sidebar = ({ isOpen, onClose }) => {
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
   `;
 
+    // Closes sidebar on mobile after clicking a link
+    const handleLinkClick = () => {
+        if (window.innerWidth < 768) {
+            onClose();
+        }
+    };
+
     return (
         <aside className={sidebarClasses}>
             {/* Header with Close Button */}
@@ -25,7 +32,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </div>
                 <button
                     onClick={onClose}
-                    className="text-gray-400 hover:text-white transition p-1 rounded-md hover:bg-gray-700"
+                    className="text-gray-400 hover:text-white transition p-1 rounded-md hover:bg-gray-700 md:hidden"
                 >
                     <X size={20} />
                 </button>
@@ -38,6 +45,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<LayoutGrid size={20} />}
                     label="Dashboard"
                     active={isActive('/dashboard') || isActive('/')}
+                    onClick={handleLinkClick}
                 />
 
                 <NavItem
@@ -45,6 +53,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<Target size={20} />}
                     label="My Work"
                     active={isActive('/my-work')}
+                    onClick={handleLinkClick}
                 />
 
                 <NavItem
@@ -52,6 +61,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<Folder size={20} />}
                     label="My Projects"
                     active={isActive('/my-projects')}
+                    onClick={handleLinkClick}
                 />
 
                 <NavItem
@@ -59,6 +69,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<Users size={20} />}
                     label="Resource Allocation"
                     active={isActive('/workload')}
+                    onClick={handleLinkClick}
                 />
 
                 <NavItem
@@ -66,6 +77,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<BarChart size={20} />}
                     label="Reports & Analytics"
                     active={isActive('/analytics')}
+                    onClick={handleLinkClick}
                 />
 
                 <NavItem
@@ -73,6 +85,7 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<CheckSquare size={20} />}
                     label="Kanban Board"
                     active={isActive('/kanban')}
+                    onClick={handleLinkClick}
                 />
 
                 <NavItem
@@ -80,14 +93,14 @@ const Sidebar = ({ isOpen, onClose }) => {
                     icon={<Clock size={20} />}
                     label="Timesheets"
                     active={isActive('/timesheet')}
+                    onClick={handleLinkClick}
                 />
             </nav>
 
             {/* User Profile Footer */}
             <div className="p-4 border-t border-gray-700 absolute bottom-0 w-full bg-[#1e293b]">
                 <div className="bg-gray-800 p-3 rounded-lg flex items-center justify-between group hover:bg-gray-750 transition">
-                    {/* Wrap user info in Link */}
-                    <Link to="/profile" className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={() => window.innerWidth < 768 && onClose()}>
+                    <Link to="/profile" className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={handleLinkClick}>
                         <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-sm shrink-0 overflow-hidden">
                             {user?.avatar && user.avatar.startsWith('http') ? (
                                 <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
@@ -120,9 +133,10 @@ const Sidebar = ({ isOpen, onClose }) => {
 };
 
 // Helper Component for Links
-const NavItem = ({ to, icon, label, active }) => (
+const NavItem = ({ to, icon, label, active, onClick }) => (
     <Link
         to={to}
+        onClick={onClick}
         className={`
       flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
       ${active

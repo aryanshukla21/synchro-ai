@@ -1,23 +1,22 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Kanban as KanbanIcon, Loader2 } from 'lucide-react';
+import { useParams, Link, useOutletContext } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Kanban as KanbanIcon, Loader2, Menu } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
-import { useSocket } from '../contexts/SocketContext'; // <-- NEW: Real-time data
+import { useSocket } from '../contexts/SocketContext';
 import TaskDetailPanel from '../components/kanban/TaskDetailPanel';
 
 const ProjectCalendar = () => {
     const { projectId } = useParams();
-    const navigate = useNavigate();
     const { showToast } = useToast();
-    const { socket } = useSocket(); // <-- NEW: Hook into global sockets
+    const { socket } = useSocket();
+    const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
 
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedTask, setSelectedTask] = useState(null);
     const [currentDate, setCurrentDate] = useState(new Date());
 
-    // 1. Initial Data Fetch
     useEffect(() => {
         const fetchTasks = async () => {
             try {
@@ -32,10 +31,8 @@ const ProjectCalendar = () => {
         fetchTasks();
     }, [projectId, showToast]);
 
-    // 2. NEW: Real-Time Socket Listeners for the Calendar
     useEffect(() => {
         if (!socket || !projectId) return;
-
         socket.emit('joinProject', projectId);
 
         const handleTaskUpdated = (updatedTask) => {
@@ -43,10 +40,7 @@ const ProjectCalendar = () => {
             setSelectedTask(prev => prev && prev._id === updatedTask._id ? updatedTask : prev);
         };
 
-        const handleTaskCreated = (newTask) => {
-            setTasks(prev => [...prev, newTask]);
-        };
-
+        const handleTaskCreated = (newTask) => setTasks(prev => [...prev, newTask]);
         const handleTaskDeleted = (deletedTaskId) => {
             setTasks(prev => prev.filter(t => t._id !== deletedTaskId));
             setSelectedTask(prev => prev && prev._id === deletedTaskId ? null : prev);
@@ -64,7 +58,6 @@ const ProjectCalendar = () => {
         };
     }, [socket, projectId]);
 
-    // --- Calendar Math Logic ---
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth();
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -82,11 +75,7 @@ const ProjectCalendar = () => {
         return tasks.filter(task => {
             if (!task.deadline) return false;
             const taskDate = new Date(task.deadline);
-            return (
-                taskDate.getDate() === day &&
-                taskDate.getMonth() === currentMonth &&
-                taskDate.getFullYear() === currentYear
-            );
+            return (taskDate.getDate() === day && taskDate.getMonth() === currentMonth && taskDate.getFullYear() === currentYear);
         });
     };
 
@@ -101,114 +90,101 @@ const ProjectCalendar = () => {
 
     if (loading) return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] text-white">
-            <Loader2 className="animate-spin text-indigo-500 mb-4" size={40} />
-            <p className="text-gray-400">Plotting tasks on calendar...</p>
+            <Loader2 className="animate-spin text-indigo-500 mb-4" size={32} />
+            <p className="text-gray-400 text-sm">Plotting tasks on calendar...</p>
         </div>
     );
 
     return (
         <div className="flex flex-col h-[calc(100vh)] bg-[#0f172a] text-gray-300 relative overflow-hidden">
-
-            {/* NEW: Unified Header with View Switcher */}
-            <div className="px-6 py-4 border-b border-gray-800 flex justify-between items-center bg-[#0f172a] flex-shrink-0 animate-in fade-in duration-300">
-                <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                        <CalendarIcon className="text-indigo-500" size={24} /> Project Timeline
+            <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 bg-[#0f172a] flex-shrink-0 animate-in fade-in duration-300">
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-1.5 bg-[#1e293b] text-white rounded-lg hover:bg-indigo-600 transition shrink-0">
+                        <Menu size={16} />
+                    </button>
+                    <h1 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+                        <CalendarIcon className="text-indigo-500" size={20} /> <span className="hidden sm:inline">Project</span> Timeline
                     </h1>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    {/* View Switcher (Board vs Calendar) */}
-                    <div className="bg-[#1e293b] p-1 rounded-lg border border-gray-700 flex items-center">
-                        <Link
-                            to={`/project/${projectId}`}
-                            className="px-4 py-1.5 text-sm font-bold text-gray-400 hover:text-white rounded-md transition flex items-center gap-2"
-                        >
-                            <KanbanIcon size={16} /> Board
+                <div className="flex items-center gap-3 sm:gap-6 w-full md:w-auto overflow-x-auto no-scrollbar pb-1 md:pb-0">
+                    <div className="bg-[#1e293b] p-1 rounded-lg border border-gray-700 flex items-center shrink-0">
+                        <Link to={`/project/${projectId}`} className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-gray-400 hover:text-white rounded-md transition flex items-center gap-1.5">
+                            <KanbanIcon size={14} /> <span className="hidden sm:inline">Board</span>
                         </Link>
-                        <div className="px-4 py-1.5 text-sm font-bold bg-indigo-600 text-white rounded-md shadow flex items-center gap-2 pointer-events-none">
-                            <CalendarIcon size={16} /> Calendar
+                        <div className="px-3 sm:px-4 py-1.5 text-xs sm:text-sm font-bold bg-indigo-600 text-white rounded-md shadow flex items-center gap-1.5 pointer-events-none">
+                            <CalendarIcon size={14} /> <span className="hidden sm:inline">Calendar</span>
                         </div>
                     </div>
 
-                    {/* Month Controls */}
-                    <div className="flex items-center gap-2 bg-[#1e293b] p-1.5 rounded-xl border border-gray-700">
-                        <button onClick={prevMonth} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                            <ChevronLeft size={18} />
+                    <div className="flex items-center gap-1.5 sm:gap-2 bg-[#1e293b] p-1 sm:p-1.5 rounded-xl border border-gray-700 shrink-0">
+                        <button onClick={prevMonth} className="p-1 sm:p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
+                            <ChevronLeft size={16} />
                         </button>
-                        <div className="w-36 text-center font-bold text-white text-sm">
+                        <div className="w-28 sm:w-36 text-center font-bold text-white text-xs sm:text-sm truncate">
                             {monthNames[currentMonth]} {currentYear}
                         </div>
-                        <button onClick={nextMonth} className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
-                            <ChevronRight size={18} />
+                        <button onClick={nextMonth} className="p-1 sm:p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition">
+                            <ChevronRight size={16} />
                         </button>
-                        <button onClick={goToToday} className="ml-2 px-3 py-1 text-xs font-bold bg-gray-700 hover:bg-gray-600 text-white rounded-md transition">
+                        <button onClick={goToToday} className="ml-1 sm:ml-2 px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold bg-gray-700 hover:bg-gray-600 text-white rounded-md transition">
                             Today
                         </button>
                     </div>
                 </div>
             </div>
 
-            {/* Calendar Grid Area */}
-            <div className={`flex-1 overflow-auto p-6 transition-all duration-300 ${selectedTask ? 'mr-[400px]' : ''}`}>
-                <div className="bg-[#1e293b] border border-gray-700 rounded-2xl overflow-hidden shadow-2xl min-w-[800px] h-full flex flex-col">
-
-                    {/* Day Headers */}
-                    <div className="grid grid-cols-7 bg-gray-800 border-b border-gray-700 flex-shrink-0">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                            <div key={day} className="py-3 text-center text-xs font-bold text-gray-400 uppercase tracking-wider border-r border-gray-700 last:border-0">
-                                {day}
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Days Grid */}
-                    <div className="grid grid-cols-7 flex-1 auto-rows-fr">
-                        {blanks.map(blank => (
-                            <div key={`blank-${blank}`} className="bg-[#0f172a]/30 border-r border-b border-gray-700/50 p-2"></div>
-                        ))}
-
-                        {days.map(day => {
-                            const dayTasks = getTasksForDay(day);
-                            const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
-
-                            return (
-                                <div key={day} className={`border-r border-b border-gray-700 p-2 overflow-y-auto custom-scrollbar relative transition min-h-[120px] ${isToday ? 'bg-indigo-900/10' : 'hover:bg-gray-800/30'}`}>
-                                    <span className={`text-xs font-bold mb-2 inline-flex items-center justify-center w-6 h-6 rounded-full ${isToday ? 'bg-indigo-500 text-white' : 'text-gray-400'}`}>
-                                        {day}
-                                    </span>
-
-                                    <div className="space-y-1.5 mt-1">
-                                        {dayTasks.map(task => (
-                                            <div
-                                                key={task._id}
-                                                onClick={() => setSelectedTask(task)}
-                                                className={`text-[11px] px-2 py-1.5 rounded border cursor-pointer transition flex items-center justify-between gap-2 group ${getStatusColor(task.status)}`}
-                                                title={`${task.title} - ${task.status}`}
-                                            >
-                                                <span className="truncate font-medium">{task.title}</span>
-
-                                                {/* Assigned User Avatar Badge */}
-                                                {task.assignedTo && (
-                                                    <div className="w-4 h-4 rounded-full bg-gray-900 flex-shrink-0 overflow-hidden flex items-center justify-center text-[8px] font-bold text-white border border-gray-700/50">
-                                                        {task.assignedTo.avatar ? (
-                                                            <img src={task.assignedTo.avatar} alt="" className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            task.assignedTo.name?.charAt(0) || '?'
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
+            <div className={`flex-1 overflow-auto p-4 sm:p-6 transition-all duration-300 ${selectedTask ? 'lg:mr-[400px]' : ''}`}>
+                <div className="bg-[#1e293b] border border-gray-700 rounded-2xl overflow-x-auto shadow-2xl h-full flex flex-col custom-scrollbar">
+                    <div className="min-w-[800px] flex-1 flex flex-col">
+                        <div className="grid grid-cols-7 bg-gray-800 border-b border-gray-700 flex-shrink-0">
+                            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                <div key={day} className="py-2.5 sm:py-3 text-center text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider border-r border-gray-700 last:border-0">
+                                    {day}
                                 </div>
-                            );
-                        })}
+                            ))}
+                        </div>
+
+                        <div className="grid grid-cols-7 flex-1 auto-rows-fr">
+                            {blanks.map(blank => (
+                                <div key={`blank-${blank}`} className="bg-[#0f172a]/30 border-r border-b border-gray-700/50 p-2"></div>
+                            ))}
+
+                            {days.map(day => {
+                                const dayTasks = getTasksForDay(day);
+                                const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
+
+                                return (
+                                    <div key={day} className={`border-r border-b border-gray-700 p-1.5 sm:p-2 overflow-y-auto custom-scrollbar relative transition min-h-[100px] sm:min-h-[120px] ${isToday ? 'bg-indigo-900/10' : 'hover:bg-gray-800/30'}`}>
+                                        <span className={`text-[10px] sm:text-xs font-bold mb-1.5 sm:mb-2 inline-flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full ${isToday ? 'bg-indigo-500 text-white' : 'text-gray-400'}`}>
+                                            {day}
+                                        </span>
+
+                                        <div className="space-y-1 sm:space-y-1.5 mt-1">
+                                            {dayTasks.map(task => (
+                                                <div
+                                                    key={task._id}
+                                                    onClick={() => setSelectedTask(task)}
+                                                    className={`text-[9px] sm:text-[11px] px-1.5 sm:px-2 py-1 sm:py-1.5 rounded border cursor-pointer transition flex items-center justify-between gap-1 sm:gap-2 group ${getStatusColor(task.status)}`}
+                                                    title={`${task.title} - ${task.status}`}
+                                                >
+                                                    <span className="truncate font-medium">{task.title}</span>
+                                                    {task.assignedTo && (
+                                                        <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full bg-gray-900 flex-shrink-0 overflow-hidden flex items-center justify-center text-[7px] sm:text-[8px] font-bold text-white border border-gray-700/50">
+                                                            {task.assignedTo.avatar ? <img src={task.assignedTo.avatar} alt="" className="w-full h-full object-cover" /> : task.assignedTo.name?.charAt(0) || '?'}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Task Detail Sidebar */}
             {selectedTask && (
                 <TaskDetailPanel task={selectedTask} onClose={() => setSelectedTask(null)} />
             )}

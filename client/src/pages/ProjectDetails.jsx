@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../contexts/ToastContext';
@@ -25,25 +25,24 @@ const ProjectDetails = () => {
     const navigate = useNavigate();
     const { showToast } = useToast();
 
-    // --- STATE ---
+    // --- NEW: Context for Mobile Menu ---
+    const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
+
     const [project, setProject] = useState(null);
     const [tasks, setTasks] = useState([]);
     const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Modals State
     const [showCreateTask, setShowCreateTask] = useState(false);
     const [showManageTeam, setShowManageTeam] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
-    // New Task Form State
     const [newTask, setNewTask] = useState({
         title: '', description: '', assignedTo: '', priority: 'Medium', deadline: ''
     });
 
-    // --- FETCH DATA ---
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
@@ -70,14 +69,8 @@ const ProjectDetails = () => {
         fetchData();
     }, [id]);
 
-    // --- HANDLERS ---
-
-    // Update Task locally when an action occurs (like Admin Review/Merge)
     const handleTaskUpdate = async (updatedTask) => {
-        // Update local tasks
         setTasks(prev => prev.map(t => t._id === updatedTask._id ? updatedTask : t));
-
-        // Refresh Activity Log to show the new "Merged" or "Declined" entry
         try {
             const activityRes = await api.get(`/activities/project/${id}`);
             setActivities(activityRes.data.data || []);
@@ -156,25 +149,17 @@ const ProjectDetails = () => {
         setProject(updatedProject);
     };
 
-    // --- CALCULATIONS ---
     if (loading) return <div className="flex items-center justify-center h-screen bg-[#0f172a] text-white animate-pulse">Loading Workspace...</div>;
     if (error || !project) return <div className="flex items-center justify-center h-screen bg-[#0f172a] text-red-400">Error: {error || "Project not found"}</div>;
 
-    // 🔥 FIX 1: Force both IDs to be strings so the Owner check never fails
     const isOwner = String(currentUser?._id) === String(project.owner?._id || project.owner);
     const activeMembers = project.members.filter(m => m.status === 'Active');
 
-    // 🔥 FIX 2: Force assignee IDs to strings so Contributors see their tasks!
     const visibleTasks = isOwner
         ? tasks
         : tasks.filter(task => {
             if (!task.assignedTo) return false;
-
-            // Handle both populated objects { _id: '...' } and raw IDs '...'
-            const assigneeId = typeof task.assignedTo === 'object'
-                ? task.assignedTo._id
-                : task.assignedTo;
-
+            const assigneeId = typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo;
             return assigneeId === currentUser?._id;
         });
 
@@ -188,7 +173,6 @@ const ProjectDetails = () => {
         submitted: tasks.filter(t => t.status === 'Submitted').length,
     };
 
-    // --- EXPORT HANDLERS ---
     const handleExportPDF = () => {
         const stats = { progressPercentage, totalTasks, completedTasks, tasksByStatus };
         generatePDF(project, tasks, stats);
@@ -209,74 +193,31 @@ const ProjectDetails = () => {
                 isOwner={isOwner}
                 onExportPDF={handleExportPDF}
                 onExportCSV={handleExportCSV}
+                isSidebarOpen={isSidebarOpen}
+                setIsSidebarOpen={setIsSidebarOpen}
             />
 
-            <div className="flex-1 overflow-y-auto p-6 scrollbar-thin scrollbar-thumb-gray-700">
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 max-w-7xl mx-auto">
-
-                    {/* LEFT COLUMN */}
-                    <div className="xl:col-span-2 space-y-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <OverallProgress
-                                progressPercentage={progressPercentage}
-                                completedTasks={completedTasks}
-                                totalTasks={totalTasks}
-                            />
-                            <WorkloadStatus
-                                tasksByStatus={tasksByStatus}
-                                totalTasks={totalTasks}
-                            />
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-gray-700">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6 max-w-7xl mx-auto">
+                    <div className="xl:col-span-2 space-y-4 sm:space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                            <OverallProgress progressPercentage={progressPercentage} completedTasks={completedTasks} totalTasks={totalTasks} />
+                            <WorkloadStatus tasksByStatus={tasksByStatus} totalTasks={totalTasks} />
                         </div>
-
-                        {/* PROJECT TASKS LIST WITH UPDATE HANDLER */}
-                        <AllProjectTasks
-                            tasks={visibleTasks} // 🔥 UPDATED: passing visibleTasks instead of all tasks
-                            isOwner={isOwner}
-                            onTaskUpdate={handleTaskUpdate}
-                        />
-
+                        <AllProjectTasks tasks={visibleTasks} isOwner={isOwner} onTaskUpdate={handleTaskUpdate} />
                         <ActivityLog activities={activities} />
                     </div>
 
-                    {/* RIGHT COLUMN */}
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                         <AIPulseCard aiSummary={project.aiSummary} />
-                        <TeamMembersCard
-                            activeMembers={activeMembers}
-                            onManageTeamClick={() => setShowManageTeam(true)}
-                        />
+                        <TeamMembersCard activeMembers={activeMembers} onManageTeamClick={() => setShowManageTeam(true)} />
                     </div>
                 </div>
             </div>
 
-            {/* MODALS */}
-            <CreateTaskModal
-                isOpen={showCreateTask}
-                onClose={() => setShowCreateTask(false)}
-                onSubmit={handleCreateTask}
-                newTask={newTask}
-                setNewTask={setNewTask}
-                activeMembers={activeMembers}
-            />
-
-            <ManageTeamModal
-                isOpen={showManageTeam}
-                onClose={() => setShowManageTeam(false)}
-                members={project.members}
-                currentUser={currentUser}
-                isOwner={isOwner}
-                onRemoveMember={handleRemoveMember}
-                onInvite={handleInviteMember}
-                onDeleteProjectClick={() => setShowDeleteModal(true)}
-            />
-
-            <DeleteConfirmationModal
-                isOpen={showDeleteModal}
-                onClose={() => setShowDeleteModal(false)}
-                onConfirm={confirmDeleteProject}
-                isDeleting={isDeleting}
-                projectTitle={project.name || project.title}
-            />
+            <CreateTaskModal isOpen={showCreateTask} onClose={() => setShowCreateTask(false)} onSubmit={handleCreateTask} newTask={newTask} setNewTask={setNewTask} activeMembers={activeMembers} />
+            <ManageTeamModal isOpen={showManageTeam} onClose={() => setShowManageTeam(false)} members={project.members} currentUser={currentUser} isOwner={isOwner} onRemoveMember={handleRemoveMember} onInvite={handleInviteMember} onDeleteProjectClick={() => setShowDeleteModal(true)} />
+            <DeleteConfirmationModal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} onConfirm={confirmDeleteProject} isDeleting={isDeleting} projectTitle={project.name || project.title} />
         </div>
     );
 };
