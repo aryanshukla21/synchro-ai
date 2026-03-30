@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useOutletContext } from 'react-router-dom';
-import { Users, Link as LinkIcon, Bell, ShieldAlert, GitMerge, Loader2, Trash2, Menu } from 'lucide-react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Users, Link as LinkIcon, Bell, ShieldAlert, GitMerge, Loader2, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 
-// Tabs
 import MembersTab from '../components/settings/MembersTab';
 import IntegrationsTab from '../components/settings/IntegrationsTab';
 import NotificationsTab from '../components/settings/NotificationsTab';
 import WorkflowTab from '../components/settings/WorkflowTab';
-
-// Modals
 import DeleteConfirmationModal from '../components/project/DeleteConfirmationModal';
 
 const Settings = () => {
@@ -19,9 +16,6 @@ const Settings = () => {
     const navigate = useNavigate();
     const { showToast } = useToast();
     const { user } = useAuth();
-
-    // Mobile Context Toggle
-    const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
 
     const [activeTab, setActiveTab] = useState('members');
     const [project, setProject] = useState(null);
@@ -84,10 +78,8 @@ const Settings = () => {
         <div className="flex-1 flex flex-col h-full bg-[#0f172a] text-gray-300 font-sans p-4 sm:p-6 md:p-10 overflow-y-auto">
             <div className="max-w-5xl mx-auto w-full">
                 <header className="mb-6 sm:mb-8">
+                    {/* Removed duplicate mobile menu button from here */}
                     <h1 className="text-xl sm:text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-1.5 sm:p-2 bg-[#1e293b] text-white rounded-lg hover:bg-indigo-600 transition shrink-0">
-                            <Menu size={18} />
-                        </button>
                         <ShieldAlert className="text-indigo-500 hidden sm:block" size={32} />
                         Workspace Settings
                     </h1>
@@ -95,7 +87,6 @@ const Settings = () => {
                 </header>
 
                 <div className="flex flex-col md:flex-row gap-6 md:gap-8">
-                    {/* Settings Sidebar Tabs */}
                     <div className="w-full md:w-64 shrink-0 space-y-2 flex flex-col justify-between">
                         <div className="space-y-2">
                             <TabButton active={activeTab === 'members'} onClick={() => setActiveTab('members')} icon={<Users size={16} className="sm:w-[18px] sm:h-[18px]" />} label="Members & Roles" />
@@ -114,7 +105,6 @@ const Settings = () => {
                         )}
                     </div>
 
-                    {/* Content Area */}
                     <div className="flex-1 bg-[#1e293b] rounded-2xl border border-gray-700 p-4 sm:p-6 md:p-8 min-h-[400px] md:min-h-[500px] shadow-xl">
                         {renderActiveTab()}
                     </div>

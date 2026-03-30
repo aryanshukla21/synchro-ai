@@ -4,13 +4,13 @@ import {
     Plus, MoreVertical, ChevronRight,
     Settings, X, Save, Loader2,
     Download, FileText, Table, ClipboardCheck,
-    FolderOpen, Bug, Menu
+    FolderOpen, Bug
 } from 'lucide-react';
 import api from '../../api/axios';
 import { useToast } from '../../contexts/ToastContext';
 import NotificationBell from '../NotificationBell';
 
-const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExportPDF, onExportCSV, isSidebarOpen, setIsSidebarOpen }) => {
+const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExportPDF, onExportCSV }) => {
     const { showToast } = useToast();
 
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -19,16 +19,14 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
 
     const [formData, setFormData] = useState({
         title: '',
-        description: '',
-        aiApiKey: ''
+        description: ''
     });
 
     useEffect(() => {
         if (project) {
             setFormData({
                 title: project.title || '',
-                description: project.description || '',
-                aiApiKey: ''
+                description: project.description || ''
             });
         }
     }, [project]);
@@ -38,7 +36,6 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
         setLoading(true);
         try {
             const payload = { title: formData.title, description: formData.description };
-            if (formData.aiApiKey.trim()) payload.aiApiKey = formData.aiApiKey;
 
             const { data } = await api.put(`/projects/${project._id}`, payload);
             if (onUpdateProject) onUpdateProject(data.data);
@@ -55,11 +52,6 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
         <>
             <header className="h-auto sm:h-16 border-b border-gray-800 bg-[#0f172a]/95 backdrop-blur flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-6 py-3 sm:py-0 shrink-0 relative z-40 gap-3 sm:gap-0">
                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 w-full sm:w-auto">
-                    {/* Mobile Menu Toggle */}
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-1.5 bg-[#1e293b] text-white rounded-lg hover:bg-indigo-600 transition shrink-0">
-                        <Menu size={16} />
-                    </button>
-
                     <Link to="/" className="hover:text-white transition shrink-0 hidden sm:block">Dashboard</Link>
                     <ChevronRight size={14} className="hidden sm:block" />
                     <span className="text-white font-bold sm:font-medium text-sm sm:text-base truncate max-w-[200px] sm:max-w-[300px]">
@@ -67,8 +59,8 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                     </span>
                 </div>
 
-                {/* Right: Actions (Scrollable horizontally on mobile) */}
-                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+                {/* Right: Actions */}
+                <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto flex-wrap sm:flex-nowrap pb-1 sm:pb-0">
 
                     <div className="relative shrink-0">
                         {/* Trigger Button */}
@@ -80,23 +72,21 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                             <span className="hidden sm:inline">Export</span>
                         </button>
 
-                        {/* Dropdown Menu */}
+                        {/* Dropdown Menu - FIXED ALIGNMENT FOR MOBILE */}
                         {showExportMenu && (
-                            <div className="absolute right-0 mt-2 w-48 bg-[#0f172a] border border-gray-700 rounded-lg shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
-                                {/* Export to PDF Option */}
+                            <div className="absolute left-0 sm:left-auto sm:right-0 mt-2 w-48 bg-[#1e293b] border border-gray-600 rounded-lg shadow-2xl z-[100] animate-in fade-in slide-in-from-top-2 overflow-hidden">
                                 <button
                                     onClick={() => { onExportPDF(); setShowExportMenu(false); }}
-                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-indigo-600/20 hover:text-white transition text-left border-b border-gray-800"
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-indigo-600 hover:text-white transition text-left border-b border-gray-700 group"
                                 >
-                                    <FileText size={16} className="text-red-400" />
+                                    <FileText size={16} className="text-red-400 group-hover:text-white transition-colors" />
                                     Export as PDF
                                 </button>
-                                {/* Export to CSV Option */}
                                 <button
                                     onClick={() => { onExportCSV(); setShowExportMenu(false); }}
-                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-indigo-600/20 hover:text-white transition text-left"
+                                    className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-300 hover:bg-indigo-600 hover:text-white transition text-left group"
                                 >
-                                    <Table size={16} className="text-emerald-400" />
+                                    <Table size={16} className="text-emerald-400 group-hover:text-white transition-colors" />
                                     Export as CSV
                                 </button>
                             </div>
@@ -105,7 +95,6 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
 
                     <div className="shrink-0"><NotificationBell /></div>
 
-                    {/* Files & Assets Button (Visible to all project members) --- */}
                     <Link
                         to={`/project/${project?._id}/assets`}
                         className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium border border-gray-700 transition shrink-0"
@@ -124,7 +113,6 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
 
                     {isOwner && (
                         <>
-                            {/* Review Submissions Button */}
                             <Link
                                 to={`/project/${project?._id}/reviews`}
                                 className="bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium border border-emerald-500/30 transition shrink-0"
@@ -133,13 +121,13 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                                 <span className="hidden lg:inline">Reviews</span>
                             </Link>
 
-                            <Link
-                                to={`/project/${project?._id}/settings`}
+                            <button
+                                onClick={() => setIsEditModalOpen(true)}
                                 className="bg-gray-800 hover:bg-gray-700 text-gray-200 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium border border-gray-700 transition shrink-0"
                             >
                                 <Settings size={14} className="sm:w-[18px] sm:h-[18px]" />
                                 <span className="hidden lg:inline">Settings</span>
-                            </Link>
+                            </button>
 
                             <button
                                 onClick={onTaskCreate}
@@ -188,6 +176,20 @@ const ProjectHeader = ({ project, onTaskCreate, onUpdateProject, isOwner, onExpo
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     className="w-full bg-[#0f172a] border border-gray-600 rounded-lg py-2.5 sm:py-3 px-3 sm:px-4 text-sm sm:text-base text-white focus:border-indigo-500 outline-none h-20 sm:h-24 resize-none transition"
                                 />
+                            </div>
+
+                            {/* Disabled API Key Field */}
+                            <div>
+                                <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-1 sm:mb-1.5">Gemini API Key</label>
+                                <input
+                                    type="password"
+                                    value="••••••••••••••••••••••••••••"
+                                    disabled
+                                    className="w-full bg-[#0f172a]/50 border border-gray-700 rounded-lg py-2.5 sm:py-3 px-3 sm:px-4 text-sm sm:text-base text-gray-500 outline-none cursor-not-allowed"
+                                />
+                                <p className="text-[10px] sm:text-xs text-rose-400/80 mt-1">
+                                    API key cannot be changed after workspace creation for security reasons.
+                                </p>
                             </div>
 
                             <div className="flex justify-end gap-2 sm:gap-3 pt-4 border-t border-gray-700/50">

@@ -21,15 +21,11 @@ const TaskWorkPage = () => {
     const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState('details');
 
-    // Unified Submission State
     const [githubLink, setGithubLink] = useState('');
     const [stagedFiles, setStagedFiles] = useState([]);
     const [isUploadingFiles, setIsUploadingFiles] = useState(false);
-
-    // Form State
     const [formData, setFormData] = useState({});
 
-    // Permission Checks
     const isOwner = task && String(user?._id) === String(task.project?.owner?._id || task.project?.owner || task.createdBy?._id || task.createdBy);
     const isAssignee = task && String(user?._id) === String(task.assignedTo?._id || task.assignedTo);
 
@@ -55,7 +51,6 @@ const TaskWorkPage = () => {
         }
     };
 
-    // --- SOCKET LOGIC ---
     useEffect(() => {
         if (!socket || !task) return;
         socket.emit('joinProject', task.project._id || task.project);
@@ -75,26 +70,22 @@ const TaskWorkPage = () => {
         };
 
         socket.on('taskUpdated', handleTaskUpdated);
-        return () => {
-            socket.off('taskUpdated', handleTaskUpdated);
-        };
+        return () => socket.off('taskUpdated', handleTaskUpdated);
     }, [socket, task, taskId]);
 
-    // --- FILE STAGING LOGIC ---
     const handleFileSelect = (e) => {
         const files = Array.from(e.target.files);
         if (stagedFiles.length + files.length > 10) {
             return showToast("You can only upload up to 10 files at once", "error");
         }
         setStagedFiles(prev => [...prev, ...files]);
-        e.target.value = ''; // Reset input so same file can be selected again if removed
+        e.target.value = '';
     };
 
     const removeStagedFile = (index) => {
         setStagedFiles(prev => prev.filter((_, i) => i !== index));
     };
 
-    // --- WORKFLOW HANDLERS ---
     const handleStartWorking = async () => {
         try {
             const { data } = await api.patch(`/task/${taskId}/status`, { status: 'In-Progress' });
@@ -105,10 +96,8 @@ const TaskWorkPage = () => {
         }
     };
 
-    // Handler for Contributor submitting work
     const handleContributorSubmit = async (e) => {
         e.preventDefault();
-
         if (stagedFiles.length === 0 && !githubLink.trim()) {
             return showToast("Please provide a GitHub link or select files to submit.", "error");
         }
@@ -118,12 +107,10 @@ const TaskWorkPage = () => {
             let fileForSubmission = null;
             const filesToAttach = [...stagedFiles];
 
-            // If no github link exists, reserve one file for the official Submission record
             if (!githubLink.trim() && filesToAttach.length > 0) {
                 fileForSubmission = filesToAttach.pop();
             }
 
-            // 1. Upload remaining staged files sequentially to task attachments
             for (const file of filesToAttach) {
                 const fd = new FormData();
                 fd.append('file', file);
@@ -132,16 +119,12 @@ const TaskWorkPage = () => {
                 });
             }
 
-            // 2. Formally Submit the Work (Triggers Review-Requested)
             if (fileForSubmission) {
                 const fd = new FormData();
                 fd.append('file', fileForSubmission);
                 fd.append('taskId', taskId);
                 fd.append('comment', 'File Submission');
-
-                await api.post('/submissions/submit', fd, {
-                    headers: { 'Content-Type': 'multipart/form-data' }
-                });
+                await api.post('/submissions/submit', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
             } else {
                 await api.post('/submissions/submit', {
                     taskId: taskId,
@@ -150,12 +133,10 @@ const TaskWorkPage = () => {
                 });
             }
 
-            // Clean up UI & update local state to hide the form
             setTask(prev => ({ ...prev, status: 'Review-Requested' }));
             setGithubLink('');
             setStagedFiles([]);
             showToast("Work submitted for review successfully!", "success");
-
         } catch (err) {
             showToast(err.response?.data?.message || "Submission failed", "error");
         } finally {
@@ -163,7 +144,6 @@ const TaskWorkPage = () => {
         }
     };
 
-    // Handler for Owner casually attaching files without submitting
     const handleOwnerUploadFiles = async () => {
         if (stagedFiles.length === 0) return;
         setIsUploadingFiles(true);
@@ -174,7 +154,7 @@ const TaskWorkPage = () => {
                 const { data } = await api.post(`/task/${taskId}/attachments`, fd, {
                     headers: { 'Content-Type': 'multipart/form-data' }
                 });
-                setTask(data.data); // Update task to show the new file immediately
+                setTask(data.data);
             }
             setStagedFiles([]);
             showToast("Files attached successfully", "success");
@@ -204,9 +184,9 @@ const TaskWorkPage = () => {
 
     return (
         <div className="flex flex-col h-full bg-[#0f172a] text-gray-300">
-            {/* Mobile Responsive Header */}
             <header className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-800 bg-[#0f172a] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 sticky top-0 z-10">
                 <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
+                    {/* REMOVED MENU BUTTON HERE */}
                     <button onClick={() => navigate(-1)} className="text-gray-400 hover:text-white transition p-1.5 bg-[#1e293b] rounded-lg shrink-0">
                         <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
                     </button>
@@ -226,7 +206,6 @@ const TaskWorkPage = () => {
             <main className="flex-1 overflow-y-auto p-4 sm:p-6 max-w-5xl mx-auto w-full">
                 {activeTab === 'details' && (
                     <div className="space-y-4 sm:space-y-6">
-                        {/* READ ONLY WARNING FOR CONTRIBUTORS */}
                         {!isOwner && (
                             <div className="bg-indigo-500/10 border border-indigo-500/20 p-3 rounded-lg flex items-start sm:items-center gap-3">
                                 <FileText className="text-indigo-400 shrink-0 mt-0.5 sm:mt-0" size={18} />
@@ -246,7 +225,6 @@ const TaskWorkPage = () => {
                                 />
                             </div>
 
-                            {/* Responsive Grid for Selects */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase mb-1.5 block">Status</label>
@@ -288,7 +266,6 @@ const TaskWorkPage = () => {
                             </div>
                         </div>
 
-                        {/* UNIFIED WORKFLOW ACTIONS & UPLOAD FOR CONTRIBUTOR */}
                         {!isOwner && isAssignee && (
                             <div className="bg-[#1e293b] border border-gray-700 p-4 sm:p-6 rounded-xl shadow-lg mt-4 sm:mt-6">
                                 <h3 className="text-xs sm:text-sm font-bold text-white mb-3 sm:mb-4 flex items-center gap-2">
@@ -307,8 +284,6 @@ const TaskWorkPage = () => {
                                 {task.status === 'In-Progress' && (
                                     <div className="space-y-5 border border-gray-700 p-4 sm:p-5 rounded-xl bg-[#0f172a]">
                                         <h4 className="text-xs sm:text-sm font-bold text-gray-400 uppercase tracking-wider">Submit Your Work</h4>
-
-                                        {/* Github Link */}
                                         <div>
                                             <label className="text-[10px] sm:text-xs font-bold text-gray-500 mb-1.5 block flex items-center gap-1.5 sm:gap-2">
                                                 <Github size={12} className="sm:w-3.5 sm:h-3.5" /> GitHub Repository Link (Optional)
@@ -322,7 +297,6 @@ const TaskWorkPage = () => {
                                             />
                                         </div>
 
-                                        {/* File Staging */}
                                         <div>
                                             <label className="text-[10px] sm:text-xs font-bold text-gray-500 mb-1.5 block flex items-center gap-1.5 sm:gap-2">
                                                 <UploadCloud size={12} className="sm:w-3.5 sm:h-3.5" /> Attach Files (Optional, up to 10)
@@ -332,8 +306,6 @@ const TaskWorkPage = () => {
                                                 <UploadCloud size={20} className="sm:w-6 sm:h-6 mx-auto text-gray-500 mb-2" />
                                                 <p className="text-xs sm:text-sm text-gray-300">Click or drag files here to stage</p>
                                             </div>
-
-                                            {/* Preview Staged Files */}
                                             {stagedFiles.length > 0 && (
                                                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                     {stagedFiles.map((f, i) => (
@@ -346,7 +318,6 @@ const TaskWorkPage = () => {
                                             )}
                                         </div>
 
-                                        {/* Final Submit Button */}
                                         <button
                                             onClick={handleContributorSubmit}
                                             disabled={isSaving || (stagedFiles.length === 0 && !githubLink.trim())}
@@ -370,7 +341,6 @@ const TaskWorkPage = () => {
                             </div>
                         )}
 
-                        {/* SHARED ATTACHMENTS VIEW & OWNER UPLOAD */}
                         <div className="bg-[#1e293b] border border-gray-700 p-4 sm:p-6 rounded-xl shadow-lg mt-4 sm:mt-6">
                             <h3 className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 sm:mb-4 flex items-center gap-2">
                                 <Paperclip size={14} className="sm:w-4 sm:h-4" /> Attached Files
@@ -424,7 +394,6 @@ const TaskWorkPage = () => {
                             )}
                         </div>
 
-                        {/* Owner Save Button */}
                         {isOwner && (
                             <div className="flex justify-end mt-4 sm:mt-6 pb-6">
                                 <button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg transition">
@@ -438,7 +407,6 @@ const TaskWorkPage = () => {
 
                 {activeTab === 'history' && (
                     <div className="bg-[#1e293b] border border-gray-700 rounded-xl p-4 sm:p-6 text-center text-gray-400 text-sm">
-                        {/* History mapping logic would go here */}
                         No changelog history available.
                     </div>
                 )}

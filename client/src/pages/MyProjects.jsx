@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import api from '../api/axios';
 import { useAuth } from '../hooks/useAuth';
-import { Menu, Folder, Shield, PenTool, Eye, ExternalLink, ChevronDown } from 'lucide-react';
+import { Folder, Shield, PenTool, Eye, ExternalLink, ChevronDown } from 'lucide-react';
 
 const MyProjects = () => {
     const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
@@ -74,10 +74,7 @@ const MyProjects = () => {
             {/* Header */}
             <div className="px-4 sm:px-6 py-4 border-b border-gray-800 flex items-center justify-between bg-[#0f172a] shrink-0">
                 <div className="flex items-center gap-3 sm:gap-4">
-                    {/* Only show menu toggle on mobile */}
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-2 bg-[#1e293b] rounded-lg hover:bg-indigo-600 transition text-white">
-                        <Menu size={20} />
-                    </button>
+                    {/* Duplicate Mobile Menu Button Removed */}
                     <h1 className="text-lg sm:text-xl font-bold text-white">My Projects</h1>
                 </div>
             </div>

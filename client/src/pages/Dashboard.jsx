@@ -61,6 +61,16 @@ const Dashboard = () => {
         }
     };
 
+    // --- NEW: Auto-fill Global API Key ---
+    const handleOpenCreateModal = () => {
+        setNewProject({
+            title: '',
+            description: '',
+            aiApiKey: user?.geminiApiKey || '' // Auto-fill if user has a global key
+        });
+        setShowModal(true);
+    };
+
     const handleCreateProject = async (e) => {
         e.preventDefault();
         try {
@@ -119,7 +129,7 @@ const Dashboard = () => {
                 </div>
                 <div className="flex items-center gap-3 sm:gap-6 shrink-0">
                     <NotificationBell />
-                    <button onClick={() => setShowModal(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold shadow-lg shadow-indigo-900/20 transition">
+                    <button onClick={handleOpenCreateModal} className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-bold shadow-lg shadow-indigo-900/20 transition">
                         <Plus size={16} className="sm:w-[18px] sm:h-[18px]" /> <span className="hidden sm:inline">New Project</span>
                     </button>
                 </div>
@@ -185,7 +195,7 @@ const Dashboard = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                             {/* 1. CREATE WORKSPACE CARD */}
                             <button
-                                onClick={() => setShowModal(true)}
+                                onClick={handleOpenCreateModal}
                                 className="bg-gradient-to-br from-indigo-600/20 to-purple-600/20 p-5 sm:p-6 rounded-xl border-2 border-dashed border-indigo-500/50 hover:border-indigo-400 hover:bg-indigo-600/30 transition flex flex-col items-center justify-center text-white gap-2 sm:gap-3 min-h-[160px] sm:min-h-[180px] group animate-in fade-in zoom-in duration-300"
                             >
                                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-indigo-500/20 flex items-center justify-center group-hover:scale-110 transition">
@@ -311,7 +321,12 @@ const Dashboard = () => {
                                     onChange={e => setNewProject({ ...newProject, aiApiKey: e.target.value })}
                                     placeholder="sk-..."
                                 />
-                                <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Required for AI task analysis features.</p>
+                                {/* Dynamic Feedback Text */}
+                                {user?.geminiApiKey && newProject.aiApiKey === user.geminiApiKey ? (
+                                    <p className="text-[10px] sm:text-xs text-emerald-400 mt-1 font-medium">✓ Pre-filled with your Global API Key.</p>
+                                ) : (
+                                    <p className="text-[10px] sm:text-xs text-gray-500 mt-1">Leave blank to use default, or set a Global Key in Profile.</p>
+                                )}
                             </div>
                             <div className="flex justify-end gap-2 sm:gap-3 mt-4 sm:mt-6 pt-4 border-t border-gray-700/50">
                                 <button type="button" onClick={() => setShowModal(false)} className="px-3 sm:px-4 py-2 text-xs sm:text-sm text-gray-400 hover:text-white transition font-medium">Cancel</button>

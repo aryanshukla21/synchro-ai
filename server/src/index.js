@@ -159,6 +159,22 @@ app.use('/api/search', searchRoutes);
 app.use('/api/timelogs', timeLogRoutes);
 app.use('/api/contact', contactRoutes);
 
+// ======== NEW CATCH-ALL ROUTE ADDED HERE ========*
+if (process.env.NODE_ENV === 'production') {
+    app.use(express.static(path.join(__dirname, '../../client/dist')));
+}
+
+// Replaced '*' string with native RegEx /(.*)/ to prevent path-to-regexp crashes
+app.get(/(.*)/, (req, res, next) => {
+    // Let API routes fall through to the Error Handler if not found
+    if (req.originalUrl.startsWith('/api')) {
+        return next();
+    }
+    // For all other routes, send the React app index
+    res.sendFile(path.resolve(__dirname, '../../client/dist', 'index.html'));
+});
+// ================================================
+
 // 5. Global Error Handling Middleware
 app.use(errorHandler);
 

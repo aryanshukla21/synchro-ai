@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useOutletContext } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Kanban as KanbanIcon, Loader2, Menu } from 'lucide-react';
+import { useParams, Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Kanban as KanbanIcon, Loader2 } from 'lucide-react';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -10,7 +10,6 @@ const ProjectCalendar = () => {
     const { projectId } = useParams();
     const { showToast } = useToast();
     const { socket } = useSocket();
-    const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
 
     const [tasks, setTasks] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -99,9 +98,7 @@ const ProjectCalendar = () => {
         <div className="flex flex-col h-[calc(100vh)] bg-[#0f172a] text-gray-300 relative overflow-hidden">
             <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 bg-[#0f172a] flex-shrink-0 animate-in fade-in duration-300">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-1.5 bg-[#1e293b] text-white rounded-lg hover:bg-indigo-600 transition shrink-0">
-                        <Menu size={16} />
-                    </button>
+                    {/* REMOVED MENU BUTTON HERE */}
                     <h1 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                         <CalendarIcon className="text-indigo-500" size={20} /> <span className="hidden sm:inline">Project</span> Timeline
                     </h1>

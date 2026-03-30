@@ -114,6 +114,7 @@ exports.verifyOtp = async (req, res, next) => {
                 name: user.name,
                 email: user.email,
                 avatar: user.avatar,
+                geminiApiKey: user.geminiApiKey,
                 token,
                 refreshToken
             },
@@ -156,6 +157,7 @@ exports.login = async (req, res, next) => {
                     name: user.name,
                     email: user.email,
                     avatar: user.avatar,
+                    geminiApiKey: user.geminiApiKey,
                     token,
                     refreshToken
                 },
@@ -266,6 +268,11 @@ exports.updateDetails = async (req, res, next) => {
         // Prevent overwriting name with undefined if only avatar is uploaded
         if (req.body.name) fieldsToUpdate.name = req.body.name;
 
+        // NEW: Capture the Global Gemini API Key from the frontend payload
+        if (req.body.geminiApiKey !== undefined) {
+            fieldsToUpdate.geminiApiKey = req.body.geminiApiKey.trim();
+        }
+
         // When using FormData, arrays are sent as comma-separated strings. We must parse it.
         if (req.body.skills) {
             fieldsToUpdate.skills = req.body.skills.split(',').map(s => s.trim()).filter(s => s);
@@ -352,6 +359,7 @@ exports.googleAuth = async (req, res, next) => {
             name: user.name,
             email: user.email,
             avatar: user.avatar,
+            geminiApiKey: user.geminiApiKey,
             token,
             refreshToken,
             isNewGoogleUser

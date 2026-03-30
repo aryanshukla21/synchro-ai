@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useOutletContext } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../hooks/useAuth';
 import {
     Bug, Search, Plus, Loader2, X,
-    AlertOctagon, CheckCircle2, ChevronRight, Menu
+    AlertOctagon, ChevronRight
 } from 'lucide-react';
 
 const IssuesTracker = () => {
     const { projectId } = useParams();
     const { user } = useAuth();
     const { showToast } = useToast();
-    const { isSidebarOpen, setIsSidebarOpen } = useOutletContext();
 
     const [issues, setIssues] = useState([]);
     const [project, setProject] = useState(null);
@@ -94,9 +93,7 @@ const IssuesTracker = () => {
         <div className="flex-1 flex flex-col h-full bg-[#0f172a] text-gray-300 font-sans">
             <header className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-800 bg-[#0f172a] shrink-0 sticky top-0 z-10">
                 <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-1.5 bg-[#1e293b] text-white rounded-lg hover:bg-indigo-600 transition shrink-0">
-                        <Menu size={16} />
-                    </button>
+                    {/* REMOVED MENU BUTTON HERE */}
                     <Link to={`/project/${projectId}`} className="hover:text-white transition truncate max-w-[120px] sm:max-w-none">{project?.title}</Link>
                     <ChevronRight size={14} className="shrink-0" />
                     <span className="text-white font-medium truncate">Issues Tracker</span>

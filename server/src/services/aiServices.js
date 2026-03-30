@@ -1,4 +1,5 @@
 const Project = require('../models/Project');
+const User = require('../models/User');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const { decrypt } = require('../utils/encryption');
 const { ApiError } = require('../utils/apiResponse');
@@ -9,11 +10,21 @@ class AIService {
         // Fetch project and explicitly select the hidden aiApiKey field
         const project = await Project.findById(projectId).select("+aiApiKey");
 
-        if (!project || !project.aiApiKey || !project.aiApiKey.content) {
-            throw new ApiError("AI API Key not found for this project. Please configure it in project settings.", 404);
+        // 1. Check if the Project has a specific API key
+        if (project && project.aiApiKey && project.aiApiKey.content) {
+            return decrypt(project.aiApiKey);
         }
 
-        return decrypt(project.aiApiKey);
+        // 2. FALLBACK: If no project key, check if the Owner has a Global API Key
+        if (project && project.owner) {
+            const owner = await User.findById(project.owner);
+            if (owner && owner.geminiApiKey) {
+                return owner.geminiApiKey; // Note: We didn't encrypt the global key in the DB per the current schema
+            }
+        }
+
+        // 3. If neither exists, throw the error
+        throw new ApiError("AI API Key not found for this project or user. Please configure it in profile or project settings.", 404);
     }
 
     async reviewSubmission(projectId, taskDetails, submissionContent) {
@@ -59,7 +70,7 @@ class AIService {
                     passedAI: false
                 };
             }
-            throw new ApiError("Failed to generate AI review", 500);
+            throw new ApiError("Failed to generate AI review. Check your API key.", 500);
         }
     };
 
@@ -96,7 +107,7 @@ class AIService {
         } catch (error) {
             console.error("AI Summary error:", error.message);
             // Return null or generic string so the frontend doesn't break
-            return "Unable to update AI summary at this time.";
+            return "Unable to update AI summary at this time. Please check your API key configuration.";
         }
     }
 }

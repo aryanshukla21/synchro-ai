@@ -4,7 +4,7 @@ import api from '../api/axios';
 import TaskCard from '../components/kanban/TaskCard';
 import TaskDetailPanel from '../components/kanban/TaskDetailPanel';
 import {
-    Search, Menu, AlertTriangle, CheckCircle2, XCircle,
+    Search, AlertTriangle, CheckCircle2, XCircle,
     ChevronDown, Loader2, Calendar as CalendarIcon, Kanban as KanbanIcon
 } from 'lucide-react';
 import { useSocket } from '../contexts/SocketContext';
@@ -171,10 +171,7 @@ const Kanban = () => {
             <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 bg-[#0f172a] flex-shrink-0 animate-in fade-in duration-300">
                 <div className="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
                     <div className="flex items-center gap-3">
-                        {/* Mobile Sidebar Menu Toggle */}
-                        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-1.5 sm:p-2 bg-[#1e293b] text-white rounded-lg hover:bg-indigo-600 transition">
-                            <Menu size={18} />
-                        </button>
+                        {/* Duplicate Mobile Menu Button Removed Here */}
                         <div className="min-w-0">
                             <h1 className="text-base sm:text-xl font-bold text-white truncate max-w-[200px] sm:max-w-none">Kanban Board</h1>
                             <p className="text-[10px] sm:text-xs text-gray-500 truncate max-w-[200px] sm:max-w-none">{project ? project.title : 'Global View'}</p>

@@ -3,7 +3,7 @@ import { Link, useOutletContext } from 'react-router-dom';
 import api from '../api/axios';
 import { useToast } from '../contexts/ToastContext';
 import {
-    CheckCircle2, Clock, AlertCircle, Calendar, Menu,
+    CheckCircle2, Clock, AlertCircle, Calendar,
     ChevronRight, Loader2, Play, AlertTriangle, Target
 } from 'lucide-react';
 
@@ -14,7 +14,6 @@ const MyWork = () => {
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('Active');
 
-    // Fetch and sorting logic remains the same...
     useEffect(() => {
         fetchMyTasks();
     }, []);
@@ -32,7 +31,6 @@ const MyWork = () => {
     };
 
     const groupTasks = () => {
-        // Implementation from original code
         const groups = { overdue: [], today: [], upcoming: [], later: [] };
         const now = new Date();
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
@@ -89,9 +87,7 @@ const MyWork = () => {
             {/* Header */}
             <header className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-800 bg-[#0f172a] sticky top-0 z-10 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
                 <div className="flex items-center gap-3">
-                    <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden p-2 bg-[#1e293b] rounded-lg hover:bg-indigo-600 transition text-white shrink-0">
-                        <Menu size={20} />
-                    </button>
+                    {/* Duplicate Mobile Menu Button Removed Here */}
                     <div>
                         <h1 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                             <Target className="text-indigo-500" size={20} />
@@ -118,7 +114,6 @@ const MyWork = () => {
             </header>
 
             <main className="flex-1 overflow-y-auto p-4 sm:p-6 scrollbar-thin scrollbar-thumb-gray-700 max-w-5xl mx-auto w-full space-y-6 sm:space-y-8">
-                {/* Sections... implementation remains the same */}
                 {groupedTasks.overdue.length > 0 && (
                     <TaskGroup title="Overdue" icon={<AlertTriangle size={16} className="text-rose-500" />} tasks={groupedTasks.overdue} borderColor="border-rose-500/30" headerColor="text-rose-400" />
                 )}
@@ -136,7 +131,6 @@ const MyWork = () => {
     );
 };
 
-// Reusable Task Group Component Mobile adjustments
 const TaskGroup = ({ title, icon, tasks, borderColor, headerColor, defaultOpen = false }) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
 

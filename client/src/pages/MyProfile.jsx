@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { User, Mail, Save, Briefcase, Upload } from 'lucide-react';
+import { User, Mail, Save, Briefcase, Upload, Key } from 'lucide-react';
 import api from '../api/axios';
 
 const MyProfile = () => {
@@ -12,7 +12,8 @@ const MyProfile = () => {
 
     const [formData, setFormData] = useState({
         name: user?.name || '',
-        skills: user?.skills?.join(', ') || ''
+        skills: user?.skills?.join(', ') || '',
+        geminiApiKey: user?.geminiApiKey || ''
     });
 
     const handleAvatarChange = (e) => {
@@ -30,6 +31,7 @@ const MyProfile = () => {
             const formPayload = new FormData();
             formPayload.append('name', formData.name);
             formPayload.append('skills', formData.skills);
+            formPayload.append('geminiApiKey', formData.geminiApiKey);
 
             if (avatarFile) {
                 formPayload.append('avatar', avatarFile);
@@ -117,6 +119,21 @@ const MyProfile = () => {
                                 className="w-full bg-[#0f172a]/50 border border-gray-700 rounded-lg p-2.5 sm:p-3 text-sm sm:text-base text-gray-500 cursor-not-allowed"
                             />
                             <p className="text-[10px] sm:text-xs text-gray-600 mt-1">Email cannot be changed.</p>
+                        </div>
+
+                        {/* New Gemini API Key field */}
+                        <div>
+                            <label className="block text-xs sm:text-sm font-medium text-gray-400 mb-2 flex items-center gap-2">
+                                <Key size={16} /> Gemini API Key (Global Config)
+                            </label>
+                            <input
+                                type="password"
+                                value={formData.geminiApiKey}
+                                onChange={(e) => setFormData({ ...formData, geminiApiKey: e.target.value })}
+                                placeholder="AIzaSy..."
+                                className="w-full bg-[#0f172a] border border-gray-600 rounded-lg p-2.5 sm:p-3 text-sm sm:text-base text-white focus:border-indigo-500 outline-none transition"
+                            />
+                            <p className="text-[10px] sm:text-xs text-gray-500 mt-1">This API key will be used as a fallback for all your projects.</p>
                         </div>
 
                         <div>

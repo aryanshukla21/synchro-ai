@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const crypto = require('crypto');
 
 const userSchema = new mongoose.Schema({
     name: {
@@ -42,7 +43,10 @@ const userSchema = new mongoose.Schema({
         type: [String],
         default: []
     },
-    // New Fields for OTP
+    geminiApiKey: {
+        type: String,
+        default: ''
+    },
     otp: {
         type: String,
         select: false
@@ -60,16 +64,13 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 userSchema.methods.getResetPasswordToken = function () {
-    // Generate token
     const resetToken = crypto.randomBytes(20).toString('hex');
 
-    // Hash token and set to resetPasswordToken field
     this.resetPasswordToken = crypto
         .createHash('sha256')
         .update(resetToken)
         .digest('hex');
 
-    // Set expire (10 minutes)
     this.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
 
     return resetToken;

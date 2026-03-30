@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import {
-    Menu, LayoutGrid, Target, Folder, Users, BarChart,
+    LayoutGrid, Target, Folder, Users, BarChart,
     CheckSquare, Clock, LogOut
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -9,14 +9,12 @@ import Sidebar from './Sidebar';
 import GlobalSocketListener from './GlobalSocketListener';
 
 const Layout = () => {
-    // Initialize sidebar state based on screen size (closed on mobile, open on desktop)
     const [isSidebarOpen, setIsSidebarOpen] = useState(
         typeof window !== 'undefined' ? window.innerWidth >= 768 : true
     );
     const location = useLocation();
     const { user, logout } = useAuth();
 
-    // Auto-collapse sidebar on resize for mobile responsiveness
     useEffect(() => {
         const handleResize = () => {
             if (window.innerWidth < 768) {
@@ -43,23 +41,19 @@ const Layout = () => {
         <div className="min-h-screen bg-[#0f172a] text-gray-300 font-sans flex relative">
             <GlobalSocketListener />
 
-            {/* Collapsed Mini-Sidebar Strip */}
             {!isSidebarOpen && (
-                <div className="fixed top-0 left-0 h-full w-14 sm:w-16 bg-[#1e293b] border-r border-gray-700 flex flex-col items-center py-4 sm:py-5 z-50 transition-all shadow-xl">
+                <div className="fixed top-0 left-0 h-[100dvh] w-14 sm:w-16 bg-[#1e293b] border-r border-gray-700 flex flex-col items-center py-4 sm:py-5 z-[60] transition-all shadow-xl">
 
-                    {/* Expand Sidebar Button - Hidden on mobile (md:flex) to keep it always mini on phones */}
+                    {/* App Logo acting as an expand button when closed */}
                     <button
                         onClick={() => setIsSidebarOpen(true)}
-                        className="hidden md:flex group relative p-2 mb-4 sm:mb-6 bg-[#0f172a] border border-gray-600 rounded-lg text-gray-400 hover:text-indigo-400 hover:border-indigo-500 transition-all shadow-md items-center justify-center"
+                        className="w-8 h-8 sm:w-10 sm:h-10 mb-4 sm:mb-6 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg cursor-pointer hover:bg-indigo-500 transition-colors shadow-lg"
+                        title="Expand Sidebar"
                     >
-                        <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
-                        <span className="absolute left-14 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-[100] transition-opacity shadow-xl border border-gray-700">
-                            Expand Sidebar
-                        </span>
+                        S
                     </button>
 
-                    {/* Navigation Icons Container */}
-                    <div className="flex-1 w-full flex flex-col items-center justify-center gap-3 sm:gap-4 mt-2">
+                    <div className="flex-1 w-full flex flex-col items-center justify-start gap-3 sm:gap-4 mt-2">
                         {navItems.map((item) => {
                             const Icon = item.icon;
                             return (
@@ -72,7 +66,6 @@ const Layout = () => {
                                         }`}
                                 >
                                     <Icon className="w-5 h-5" />
-                                    {/* Tooltip appears on hover / long-press */}
                                     <span className="absolute left-14 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-gray-900 text-white text-xs font-bold rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-[100] transition-opacity shadow-xl border border-gray-700">
                                         {item.label}
                                     </span>
@@ -81,7 +74,6 @@ const Layout = () => {
                         })}
                     </div>
 
-                    {/* Footer: Profile & Logout */}
                     <div className="mt-auto w-full flex flex-col items-center gap-3 sm:gap-4 pt-4 border-t border-gray-700">
                         <Link to="/profile" className="group relative">
                             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs sm:text-sm overflow-hidden ring-2 ring-transparent hover:ring-indigo-400 transition-all">

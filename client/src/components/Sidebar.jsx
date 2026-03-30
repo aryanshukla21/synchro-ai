@@ -8,14 +8,12 @@ const Sidebar = ({ isOpen, onClose }) => {
 
     const isActive = (path) => location.pathname === path;
 
-    // CSS classes for the sidebar transition
     const sidebarClasses = `
-    fixed top-0 left-0 h-full bg-[#1e293b] border-r border-gray-700 w-64 z-50
+    fixed top-0 left-0 h-[100dvh] bg-[#1e293b] border-r border-gray-700 w-64 z-[70]
     transform transition-transform duration-300 ease-in-out shadow-2xl
     ${isOpen ? 'translate-x-0' : '-translate-x-full'}
   `;
 
-    // Closes sidebar on mobile after clicking a link
     const handleLinkClick = () => {
         if (window.innerWidth < 768) {
             onClose();
@@ -24,7 +22,6 @@ const Sidebar = ({ isOpen, onClose }) => {
 
     return (
         <aside className={sidebarClasses}>
-            {/* Header with Close Button */}
             <div className="p-6 flex items-center justify-between border-b border-gray-700">
                 <div className="flex items-center gap-3 text-white font-bold text-xl">
                     <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">S</div>
@@ -38,66 +35,16 @@ const Sidebar = ({ isOpen, onClose }) => {
                 </button>
             </div>
 
-            {/* Navigation Links */}
             <nav className="flex-1 px-4 space-y-2 mt-6 overflow-y-auto max-h-[calc(100vh-200px)] scrollbar-thin scrollbar-thumb-gray-700">
-                <NavItem
-                    to="/dashboard"
-                    icon={<LayoutGrid size={20} />}
-                    label="Dashboard"
-                    active={isActive('/dashboard') || isActive('/')}
-                    onClick={handleLinkClick}
-                />
-
-                <NavItem
-                    to="/my-work"
-                    icon={<Target size={20} />}
-                    label="My Work"
-                    active={isActive('/my-work')}
-                    onClick={handleLinkClick}
-                />
-
-                <NavItem
-                    to="/my-projects"
-                    icon={<Folder size={20} />}
-                    label="My Projects"
-                    active={isActive('/my-projects')}
-                    onClick={handleLinkClick}
-                />
-
-                <NavItem
-                    to="/workload"
-                    icon={<Users size={20} />}
-                    label="Resource Allocation"
-                    active={isActive('/workload')}
-                    onClick={handleLinkClick}
-                />
-
-                <NavItem
-                    to="/analytics"
-                    icon={<BarChart size={20} />}
-                    label="Reports & Analytics"
-                    active={isActive('/analytics')}
-                    onClick={handleLinkClick}
-                />
-
-                <NavItem
-                    to="/kanban"
-                    icon={<CheckSquare size={20} />}
-                    label="Kanban Board"
-                    active={isActive('/kanban')}
-                    onClick={handleLinkClick}
-                />
-
-                <NavItem
-                    to="/timesheet"
-                    icon={<Clock size={20} />}
-                    label="Timesheets"
-                    active={isActive('/timesheet')}
-                    onClick={handleLinkClick}
-                />
+                <NavItem to="/dashboard" icon={<LayoutGrid size={20} />} label="Dashboard" active={isActive('/dashboard') || isActive('/')} onClick={handleLinkClick} />
+                <NavItem to="/my-work" icon={<Target size={20} />} label="My Work" active={isActive('/my-work')} onClick={handleLinkClick} />
+                <NavItem to="/my-projects" icon={<Folder size={20} />} label="My Projects" active={isActive('/my-projects')} onClick={handleLinkClick} />
+                <NavItem to="/workload" icon={<Users size={20} />} label="Resource Allocation" active={isActive('/workload')} onClick={handleLinkClick} />
+                <NavItem to="/analytics" icon={<BarChart size={20} />} label="Reports & Analytics" active={isActive('/analytics')} onClick={handleLinkClick} />
+                <NavItem to="/kanban" icon={<CheckSquare size={20} />} label="Kanban Board" active={isActive('/kanban')} onClick={handleLinkClick} />
+                <NavItem to="/timesheet" icon={<Clock size={20} />} label="Timesheets" active={isActive('/timesheet')} onClick={handleLinkClick} />
             </nav>
 
-            {/* User Profile Footer */}
             <div className="p-4 border-t border-gray-700 absolute bottom-0 w-full bg-[#1e293b]">
                 <div className="bg-gray-800 p-3 rounded-lg flex items-center justify-between group hover:bg-gray-750 transition">
                     <Link to="/profile" className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer" onClick={handleLinkClick}>
@@ -114,14 +61,13 @@ const Sidebar = ({ isOpen, onClose }) => {
                         </div>
                     </Link>
 
-                    {/* Logout Button */}
                     <button
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             logout();
                         }}
-                        className="text-gray-500 hover:text-red-400 transition ml-2"
+                        className="text-gray-500 hover:text-red-400 transition ml-2 z-50 relative"
                         title="Logout"
                     >
                         <LogOut size={18} />
@@ -132,7 +78,6 @@ const Sidebar = ({ isOpen, onClose }) => {
     );
 };
 
-// Helper Component for Links
 const NavItem = ({ to, icon, label, active, onClick }) => (
     <Link
         to={to}
